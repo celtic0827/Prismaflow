@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -31,7 +32,8 @@ import {
   Library,
   LayoutTemplate,
   Package,
-  HelpCircle
+  HelpCircle,
+  Type
 } from './components/Icons';
 import { Segment, SelectionState, groupSegments, SectionGroup, SavedProject, SegmentType, OptionPreset, SectionPreset } from './types';
 import { Modal } from './components/Modal';
@@ -424,6 +426,9 @@ export default function App() {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [savingSectionId, setSavingSectionId] = useState<string | null>(null); // Temp ID for section being saved
   const [presetNameInput, setPresetNameInput] = useState('');
+  
+  // Delete Confirmation State
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'project' | 'option' | 'section', id: string, name: string } | null>(null);
 
   const labelRefs = useRef<{[key: string]: HTMLElement | null}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -459,20 +464,7 @@ export default function App() {
     if (s.type === 'random') {
         const disabled = s.disabledIndices || [];
         const options = s.content as string[];
-        // If the entire block is disabled (all options disabled), it shouldn't output text in the prompt?
-        // Or should it output the first dimmed one? 
-        // Usually, disabled blocks don't contribute to the final prompt.
-        // However, based on the request "show first item but dimmed", it implies it's still visible in the editor.
-        // For the *Generated Prompt* (resultPrompt), let's assume fully disabled blocks are silent, 
-        // OR we output the value if it's active.
-        // If the user manually disabled everything, it likely shouldn't be in the result.
-        // Let's check if the current activeValue is actually enabled.
-        const isActiveEnabled = options.indexOf(s.activeValue || '') !== -1 && !disabled.includes(options.indexOf(s.activeValue || ''));
-        
-        // If the active value is technically "enabled" (or forced), we return it.
-        // But if ALL are disabled, we return empty string for the generated prompt?
-        // Let's stick to: Output the active value IF it is not effectively "off". 
-        // If the UI shows it as "dimmed/off", it shouldn't be in the prompt.
+        // Output the active value IF it is not effectively "off". 
         if (options.length > 0 && options.every((_, i) => disabled.includes(i))) {
             return ''; // All disabled -> No output
         }
@@ -758,6 +750,23 @@ export default function App() {
     setSelection({ startId: null, endId: null, startOffset: 0, endOffset: 0, text: '' });
   };
 
+  const handleFlattenOption = (id: string) => {
+    const index = segments.findIndex(s => s.id === id);
+    if (index === -1) return;
+    const seg = segments[index];
+    const text = seg.activeValue || '';
+    
+    // Replace Option segment with Text segment containing current value
+    const newSegments = [...segments];
+    newSegments[index] = { id: uuidv4(), type: 'text', content: text };
+    
+    // Normalization will merge with adjacent text segments
+    updateSegments(newSegments);
+    setEditingSegmentId(null);
+    setSelectedOptionId(null);
+    showNotification("Converted to Text");
+  };
+
   const updateRandomOptions = (newOptions: string[], newDisabledIndices: number[]) => {
     if (editingSegmentId) {
         // Editing a block on the canvas
@@ -909,9 +918,8 @@ export default function App() {
   };
 
   const handleDeletePreset = (id: string) => {
-      if (confirm("Delete this preset?")) {
-          setOptionPresets(prev => prev.filter(p => p.id !== id));
-      }
+      const p = optionPresets.find(x => x.id === id);
+      if(p) setDeleteTarget({ type: 'option', id, name: p.name });
   };
 
   // --- Section Preset Actions ---
@@ -987,9 +995,8 @@ export default function App() {
   };
 
   const handleDeleteSectionPreset = (id: string) => {
-      if (confirm("Delete this section preset?")) {
-          setSectionPresets(prev => prev.filter(p => p.id !== id));
-      }
+      const p = sectionPresets.find(x => x.id === id);
+      if(p) setDeleteTarget({ type: 'section', id, name: p.name });
   };
 
 
@@ -1006,7 +1013,7 @@ export default function App() {
           if (enabledOptions.length > 0) {
               return { ...seg, activeValue: getRandom(enabledOptions) };
           }
-          // If all disabled, keep current or first (it will be rendered dim anyway)
+          // If all disabled, keep current or first (it will be rendered dim)
           return seg;
         }
         return seg;
@@ -1351,16 +1358,11 @@ export default function App() {
       setCurrentProjectId(p.id);
       showNotification("Project Loaded");
   };
+  
   const handleDeleteProject = (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      if (confirm('Delete project?')) {
-          setSavedProjects(prev => prev.filter(p => p.id !== id));
-          // FIX: If we delete the current project, detach the workspace so next save works correctly
-          if (currentProjectId === id) {
-              setCurrentProjectId(null);
-              showNotification("Project Deleted (Workspace Unsaved)");
-          }
-      }
+      const p = savedProjects.find(x => x.id === id);
+      if (p) setDeleteTarget({ type: 'project', id, name: p.name });
   };
   
   // Backup Functions
@@ -1480,6 +1482,24 @@ export default function App() {
   const handleCloseEditor = () => {
       setEditingSegmentId(null);
       setEditingPresetId(null);
+  };
+  
+  const executeDelete = () => {
+      if (!deleteTarget) return;
+      const { type, id } = deleteTarget;
+      
+      if (type === 'project') {
+          setSavedProjects(prev => prev.filter(p => p.id !== id));
+          if (currentProjectId === id) {
+              setCurrentProjectId(null);
+              showNotification("Project Deleted (Workspace Unsaved)");
+          }
+      } else if (type === 'option') {
+          setOptionPresets(prev => prev.filter(p => p.id !== id));
+      } else if (type === 'section') {
+          setSectionPresets(prev => prev.filter(p => p.id !== id));
+      }
+      setDeleteTarget(null);
   };
 
   if (!segments) return <div className="min-h-screen bg-canvas-950 flex items-center justify-center text-canvas-500 font-mono">Loading Prismaflow...</div>;
@@ -1612,13 +1632,14 @@ export default function App() {
                             contentEditable={false}
                             onClick={(e) => { e.stopPropagation(); setSelectedOptionId(seg.id); }}
                             className={`inline-flex items-center align-baseline mx-1 my-0.5 rounded border select-none group/opt relative shadow-sm transition-all hover:bg-canvas-800/80
-                                ${isSelected ? 'border-brand-500 bg-brand-900/20 ring-1 ring-brand-500/50' : 'border-canvas-700 bg-canvas-800 hover:border-brand-500/50 hover:shadow-brand-500/10'}
-                                ${allDisabled ? 'opacity-50 grayscale' : ''}
+                                ${isSelected ? 'border-brand-500 bg-brand-900/20 ring-1 ring-brand-500/50' : 
+                                  allDisabled ? 'border-canvas-800 bg-canvas-900' :
+                                  'border-canvas-700 bg-canvas-800 hover:border-brand-500/50 hover:shadow-brand-500/10'}
                             `}
                         >
                             {/* Value Display */}
                             <span 
-                                className={`px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm ${allDisabled ? 'text-canvas-500' : ''}`}
+                                className={`px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm ${allDisabled ? 'text-canvas-600' : ''}`}
                                 title={`Options: ${(seg.content as string[]).join(', ')}`}
                             >
                                 {seg.activeValue || '(empty)'}
@@ -1634,6 +1655,13 @@ export default function App() {
                                         title="Edit Options"
                                     >
                                         <Edit3 size={14} />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleFlattenOption(seg.id); }}
+                                        className="p-1 hover:bg-purple-600 hover:text-white text-canvas-400 transition-colors rounded"
+                                        title="Convert to Text"
+                                    >
+                                        <Type size={14} />
                                     </button>
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); deleteSegment(seg.id); }}
@@ -1840,6 +1868,25 @@ export default function App() {
                    <button onClick={confirmSaveSection} className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-bold shadow-lg shadow-brand-500/20">Save Section</button>
                </div>
            </div>
+        </Modal>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Confirm Deletion">
+            <div className="space-y-4 font-sans">
+                <div className="bg-red-900/20 p-3 rounded border border-red-500/30 flex items-center gap-3">
+                   <Trash2 className="text-red-400" size={18} />
+                   <p className="text-xs text-red-200">
+                       Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
+                       <br/>This action cannot be undone.
+                   </p>
+               </div>
+               <div className="flex justify-end gap-2 pt-2">
+                   <button onClick={() => setDeleteTarget(null)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
+                   <button onClick={executeDelete} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-bold shadow-lg shadow-red-500/20">Delete Forever</button>
+               </div>
+            </div>
         </Modal>
       )}
 

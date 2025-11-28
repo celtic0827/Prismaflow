@@ -42,7 +42,8 @@ import {
   Package,
   HelpCircle,
   CheckSquare,
-  Square
+  Square,
+  Type
 } from 'lucide-react';
 
 export { 
@@ -88,5 +89,6 @@ export {
   Package,
   HelpCircle,
   CheckSquare,
-  Square
+  Square,
+  Type
 };
