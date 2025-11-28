@@ -1,6 +1,6 @@
 # Prismaflow: Modular Prompt Studio
 
-![Prismaflow Interface](https://upload.cc/i1/2025/11/28/zY90Qu.jpg)
+![Prismaflow Interface](https://upload.cc/i1/2025/11/28/FgVziq.jpg)
 
 > **Structure. Randomize. Flow.**
 
