@@ -1549,8 +1549,8 @@ export default function App() {
                 onClick={handleContainerClick}
                 onCopy={handleNativeCopy}
                 onPaste={handleNativePaste}
-                // Mobile: Fixed height (500px) to ensure scrollability and visibility. Desktop: Flex-1 to fill parent.
-                className="h-[500px] lg:h-auto lg:flex-1 bg-canvas-900/50 border border-canvas-800 rounded-lg p-6 overflow-y-auto custom-scrollbar shadow-inner relative z-10 cursor-text text-left leading-loose font-mono text-sm md:text-base"
+                // Mobile: Fixed height (400px) ensures editor is scrollable but doesn't fill screen. Desktop: Flex-1 fills available space.
+                className="h-[400px] lg:h-auto lg:flex-1 bg-canvas-900/50 border border-canvas-800 rounded-lg p-6 overflow-y-auto custom-scrollbar shadow-inner relative z-10 cursor-text text-left leading-loose font-mono text-sm md:text-base"
             >
                 {segments.map((seg, idx) => {
                     if (seg.type === 'label') {
@@ -1667,8 +1667,8 @@ export default function App() {
             </div>
         </div>
 
-        {/* Tabbed Sidebar - Mobile: Fixed height (500px) to prevent collapse. Desktop: Fixed width (72) & full height. */}
-        <div className="w-full lg:w-72 flex-shrink-0 h-[500px] lg:h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden">
+        {/* Tabbed Sidebar - Mobile: h-auto allows it to flow naturally. Desktop: Fixed width & full height. */}
+        <div className="w-full lg:w-72 flex-shrink-0 h-auto lg:h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden">
              
              {/* Tab Header - FIXED: Consistent py-2 padding */}
              <div className="flex shrink-0 border-b border-canvas-800">
@@ -1688,9 +1688,9 @@ export default function App() {
 
              {/* Tab Content: Library */}
              {activeSidebarTab === 'library' && (
-                 <div className="flex-1 overflow-hidden flex flex-col">
+                 <div className="flex flex-col lg:flex-1 lg:overflow-hidden">
                      {/* 1. Option Presets */}
-                     <div className="flex-1 min-h-0 flex flex-col border-b border-canvas-800">
+                     <div className="flex flex-col lg:flex-1 lg:min-h-0 border-b border-canvas-800">
                          {/* Library Headers - FIXED: Consistent px-3 py-2 padding */}
                          <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between">
                             <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><Folder size={12}/> Options</h4>
@@ -1703,7 +1703,7 @@ export default function App() {
                                 <Plus size={14}/>
                             </button>
                          </div>
-                         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                         <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
                              {optionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No options saved</div>}
                              {optionPresets.map(preset => (
                                 <div key={preset.id} className="group border border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800 rounded-md p-2 transition-all">
@@ -1722,13 +1722,13 @@ export default function App() {
                      </div>
 
                      {/* 2. Section Presets */}
-                     <div className="flex-1 min-h-0 flex flex-col">
+                     <div className="flex flex-col lg:flex-1 lg:min-h-0">
                          {/* Library Headers - FIXED: Consistent px-3 py-2 padding */}
                          <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between border-t border-canvas-800">
                             <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><LayoutTemplate size={12}/> Sections</h4>
                             {/* Save handled via Label Menu */}
                          </div>
-                         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                         <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
                              {sectionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No sections saved</div>}
                              {sectionPresets.map(preset => (
                                 <div key={preset.id} className="group border border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800 rounded-md p-2 transition-all flex items-center justify-between">
@@ -1749,7 +1749,7 @@ export default function App() {
 
              {/* Tab Content: Projects */}
              {activeSidebarTab === 'projects' && (
-                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                 <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
                      {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full text-canvas-600 space-y-3 text-center p-4"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
                      {savedProjects.map(p => (
                         <div key={p.id} onClick={() => handleLoadProject(p)} className={`group border rounded-md p-3 cursor-pointer ${currentProjectId === p.id ? 'bg-brand-900/10 border-brand-500/40' : 'bg-transparent border-transparent hover:bg-canvas-800 hover:border-canvas-700'}`}>
