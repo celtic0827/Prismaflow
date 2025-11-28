@@ -1514,8 +1514,10 @@ export default function App() {
         <p className="text-canvas-500 font-mono text-xs tracking-[0.2em] uppercase">Modular Prompt Engine</p>
       </header>
 
-      <main className="w-full max-w-7xl flex flex-col lg:flex-row gap-6 items-start h-[calc(100vh-200px)]">
-        <div className="flex-1 w-full min-w-0 flex flex-col h-full gap-4">
+      {/* Mobile Layout Fix: Allow h-auto on mobile, fixed height on desktop */}
+      <main className="w-full max-w-7xl flex flex-col lg:flex-row gap-6 items-start h-auto lg:h-[calc(100vh-200px)]">
+        {/* Left Column (Toolbar + Editor) */}
+        <div className="flex-1 w-full min-w-0 flex flex-col h-auto lg:h-full gap-4">
             {/* Toolbar - FIXED: Consistent px-3 py-2 padding, smaller text */}
             <div className="bg-canvas-900 border border-canvas-800 rounded-lg px-3 py-2 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
                 <div className="flex-1 w-full md:w-auto flex gap-2 items-center">
@@ -1547,7 +1549,8 @@ export default function App() {
                 onClick={handleContainerClick}
                 onCopy={handleNativeCopy}
                 onPaste={handleNativePaste}
-                className="flex-1 bg-canvas-900/50 border border-canvas-800 rounded-lg p-6 overflow-y-auto custom-scrollbar shadow-inner relative z-10 cursor-text text-left leading-loose font-mono text-sm md:text-base"
+                // Mobile: Fixed height (500px) to ensure scrollability and visibility. Desktop: Flex-1 to fill parent.
+                className="h-[500px] lg:h-auto lg:flex-1 bg-canvas-900/50 border border-canvas-800 rounded-lg p-6 overflow-y-auto custom-scrollbar shadow-inner relative z-10 cursor-text text-left leading-loose font-mono text-sm md:text-base"
             >
                 {segments.map((seg, idx) => {
                     if (seg.type === 'label') {
@@ -1664,8 +1667,8 @@ export default function App() {
             </div>
         </div>
 
-        {/* Tabbed Sidebar */}
-        <div className="w-full lg:w-72 flex-shrink-0 h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden">
+        {/* Tabbed Sidebar - Mobile: Fixed height (500px) to prevent collapse. Desktop: Fixed width (72) & full height. */}
+        <div className="w-full lg:w-72 flex-shrink-0 h-[500px] lg:h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden">
              
              {/* Tab Header - FIXED: Consistent py-2 padding */}
              <div className="flex shrink-0 border-b border-canvas-800">
