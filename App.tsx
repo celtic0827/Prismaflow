@@ -428,6 +428,7 @@ export default function App() {
 
   const labelRefs = useRef<{[key: string]: HTMLElement | null}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // --- Actions ---
@@ -1305,13 +1306,98 @@ export default function App() {
       e.stopPropagation();
       if (confirm('Delete project?')) {
           setSavedProjects(prev => prev.filter(p => p.id !== id));
-          if (currentProjectId === id) setCurrentProjectId(null);
       }
   };
   
-  const handleExportCSV = () => {}; 
+  // Backup Functions
+  const handleExportBackup = () => {
+      const backupData = {
+          version: 1,
+          timestamp: Date.now(),
+          projects: savedProjects,
+          optionPresets,
+          sectionPresets
+      };
+      const filename = `prismaflow_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showNotification("Backup Exported");
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          try {
+              const content = e.target?.result as string;
+              const data = JSON.parse(content);
+              
+              if (!data || !data.version) throw new Error("Invalid backup file");
+
+              let importedProjectsCount = 0;
+              let importedOptionsCount = 0;
+              let importedSectionsCount = 0;
+
+              // Merge Projects
+              if (Array.isArray(data.projects)) {
+                  setSavedProjects(prev => {
+                      const existingIds = new Set(prev.map(p => p.id));
+                      const newItems = data.projects.map((p: SavedProject) => {
+                          if (existingIds.has(p.id)) return { ...p, id: uuidv4(), name: p.name + ' (Imported)' };
+                          return p;
+                      });
+                      importedProjectsCount = newItems.length;
+                      return [...prev, ...newItems];
+                  });
+              }
+
+              // Merge Option Presets
+              if (Array.isArray(data.optionPresets)) {
+                  setOptionPresets(prev => {
+                      const existingIds = new Set(prev.map(p => p.id));
+                      const newItems = data.optionPresets.map((p: OptionPreset) => {
+                           if (existingIds.has(p.id)) return { ...p, id: uuidv4(), name: p.name + ' (Imported)' };
+                           return p;
+                      });
+                      importedOptionsCount = newItems.length;
+                      return [...prev, ...newItems];
+                  });
+              }
+
+              // Merge Section Presets
+              if (Array.isArray(data.sectionPresets)) {
+                   setSectionPresets(prev => {
+                      const existingIds = new Set(prev.map(p => p.id));
+                      const newItems = data.sectionPresets.map((p: SectionPreset) => {
+                           if (existingIds.has(p.id)) return { ...p, id: uuidv4(), name: p.name + ' (Imported)' };
+                           return p;
+                      });
+                      importedSectionsCount = newItems.length;
+                      return [...prev, ...newItems];
+                  });
+              }
+
+              showNotification(`Restored: ${importedProjectsCount} Projects, ${importedOptionsCount} Options, ${importedSectionsCount} Sections`);
+          } catch (err) {
+              console.error(err);
+              showNotification("Failed to parse backup file");
+          }
+          if (backupFileInputRef.current) backupFileInputRef.current.value = '';
+      };
+      reader.readAsText(file);
+  };
+  
   const handleImportCSV = (e: any) => {};
-  const handleImportClick = () => fileInputRef.current?.click();
+  const handleImportClick = () => backupFileInputRef.current?.click();
 
   const groupsForCalc = groupSegments(segments);
   let currentHighlightColor = DEFAULT_TEXT_COLOR;
@@ -1339,6 +1425,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-canvas-950 flex flex-col items-center py-10 px-4 md:px-8">
       <input type="file" ref={fileInputRef} onChange={handleImportCSV} className="hidden" />
+      <input type="file" ref={backupFileInputRef} onChange={handleImportBackup} accept=".json" className="hidden" />
       
       {/* Notifications - FIXED: Strictly conditional rendering to prevent ghost icon */}
       {notification && notification.trim() !== '' && (
@@ -1381,6 +1468,11 @@ export default function App() {
                     <div className="w-px h-4 bg-canvas-800 mx-2"></div>
                     <button onClick={handleSaveProject} className="p-1.5 text-canvas-400 hover:text-white rounded" title="Save"><Save size={16}/></button>
                     <button onClick={handleSaveAsNew} className="p-1.5 text-canvas-400 hover:text-emerald-400 rounded" title="Save Copy"><FilePlus size={16}/></button>
+                    
+                    {/* Backup Controls */}
+                    <button onClick={handleExportBackup} className="p-1.5 text-canvas-400 hover:text-sky-400 rounded" title="Export Backup"><Upload size={16}/></button>
+                    <button onClick={handleImportClick} className="p-1.5 text-canvas-400 hover:text-purple-400 rounded" title="Import Backup"><Download size={16}/></button>
+                    
                     <div className="w-px h-4 bg-canvas-800 mx-2"></div>
                     <button onClick={handleClear} className="p-1.5 text-canvas-400 hover:text-red-400 rounded" title="Clear"><Trash2 size={16}/></button>
                 </div>
