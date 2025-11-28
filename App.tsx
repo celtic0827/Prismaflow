@@ -719,6 +719,13 @@ export default function App() {
     if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('[contenteditable="false"]')) return;
 
+    // FIX: If the user has selected text (Range), do not force-move the cursor.
+    // This happens when a user drags to select text and releases mouse (triggering click).
+    const currentSel = window.getSelection();
+    if (currentSel && !currentSel.isCollapsed && currentSel.toString().length > 0) {
+        return;
+    }
+
     const clickY = e.clientY;
     const spans = Array.from(editorContainerRef.current.querySelectorAll('span[data-segment-id]'));
     
