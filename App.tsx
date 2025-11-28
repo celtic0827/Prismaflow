@@ -1191,7 +1191,7 @@ export default function App() {
           updateSegments([...segments, ...pastedSegments]);
       } else {
           // Append
-          updateSegments([...segments, { id: uuidv4(), type: 'text', content: text });
+          updateSegments([...segments, { id: uuidv4(), type: 'text', content: text }]);
       }
   };
 
