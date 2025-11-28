@@ -9,7 +9,8 @@ import {
   X,
   Tag,
   Check,
-  Copy
+  Copy,
+  FolderPlus
 } from './Icons';
 
 interface LabelMenuProps {
@@ -24,6 +25,7 @@ interface LabelMenuProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onCopySection: () => void;
+  onSaveToLibrary: () => void;
   onDeleteLabel: () => void;
   onDeleteSection: () => void;
   isFirst: boolean;
@@ -42,6 +44,7 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   onMoveUp,
   onMoveDown,
   onCopySection,
+  onSaveToLibrary,
   onDeleteLabel,
   onDeleteSection,
   isFirst,
@@ -66,7 +69,7 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
         let top = rect.top;
         let left = rect.right + 8;
         if (left + MENU_WIDTH > window.innerWidth) left = rect.left - MENU_WIDTH - 8;
-        if (top + 350 > window.innerHeight) top = Math.max(10, window.innerHeight - 360);
+        if (top + 400 > window.innerHeight) top = Math.max(10, window.innerHeight - 410);
         setPosition({ top, left });
     }
   }, [isOpen, anchorRef]);
@@ -151,6 +154,10 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
         </div>
 
         <div className="h-px bg-canvas-800 my-1" />
+
+        <button onClick={(e) => { e.stopPropagation(); onSaveToLibrary(); }} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left transition-colors">
+          <FolderPlus size={14} /> Save to Library
+        </button>
 
         <button onClick={(e) => { e.stopPropagation(); onCopySection(); }} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left transition-colors">
           <Copy size={14} /> Copy Section

@@ -1,3 +1,4 @@
+
 import { 
   Sparkles, 
   Dna, 
@@ -32,7 +33,14 @@ import {
   Settings,
   Command,
   Terminal,
-  Sliders
+  Sliders,
+  FolderPlus,
+  ArrowRightLeft,
+  MousePointer2,
+  LayoutTemplate,
+  Library,
+  Package,
+  HelpCircle
 } from 'lucide-react';
 
 export { 
@@ -69,5 +77,12 @@ export {
   Settings,
   Command,
   Terminal,
-  Sliders
+  Sliders,
+  FolderPlus,
+  ArrowRightLeft,
+  MousePointer2,
+  LayoutTemplate,
+  Library,
+  Package,
+  HelpCircle
 };

@@ -35,6 +35,18 @@ export interface SavedProject {
   updatedAt: number;
 }
 
+export interface OptionPreset {
+  id: string;
+  name: string;
+  options: string[];
+}
+
+export interface SectionPreset {
+  id: string;
+  name: string;
+  data: Segment[];
+}
+
 export const groupSegments = (segments: Segment[]): SectionGroup[] => {
   const groups: SectionGroup[] = [];
   let currentGroup: SectionGroup = { contentSegments: [] };
