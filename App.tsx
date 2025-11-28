@@ -1499,7 +1499,7 @@ export default function App() {
       {/* Help Button - Conditional render inside Modal check, but Button is always visible */}
       <button 
         onClick={() => setIsHelpModalOpen(true)}
-        className="fixed z-50 p-2 text-canvas-500 hover:text-brand-400 transition-colors bg-canvas-900/50 rounded-full border border-canvas-800 hover:border-brand-500/50 right-4 top-24 lg:top-6 lg:right-6"
+        className="fixed z-50 p-2 text-canvas-500 hover:text-brand-400 transition-colors bg-canvas-900/50 rounded-full border border-canvas-800 hover:border-brand-500/50 right-4 bottom-6 lg:bottom-auto lg:top-6 lg:right-6"
         title="Help & Guide"
       >
         <HelpCircle size={24} />
