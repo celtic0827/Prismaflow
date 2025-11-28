@@ -1,0 +1,5 @@
+{
+  "name": "Prismaflow",
+  "description": "A modular prompt studio for generative AI that enables controlled variance through structured options blocks.",
+  "requestFramePermissions": []
+}
