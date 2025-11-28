@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -457,7 +458,28 @@ export default function App() {
   // --- Derived ---
   const resultPrompt = segments.map(s => {
     if (s.type === 'text') return s.content;
-    if (s.type === 'random') return s.activeValue || '';
+    if (s.type === 'random') {
+        const disabled = s.disabledIndices || [];
+        const options = s.content as string[];
+        // If the entire block is disabled (all options disabled), it shouldn't output text in the prompt?
+        // Or should it output the first dimmed one? 
+        // Usually, disabled blocks don't contribute to the final prompt.
+        // However, based on the request "show first item but dimmed", it implies it's still visible in the editor.
+        // For the *Generated Prompt* (resultPrompt), let's assume fully disabled blocks are silent, 
+        // OR we output the value if it's active.
+        // If the user manually disabled everything, it likely shouldn't be in the result.
+        // Let's check if the current activeValue is actually enabled.
+        const isActiveEnabled = options.indexOf(s.activeValue || '') !== -1 && !disabled.includes(options.indexOf(s.activeValue || ''));
+        
+        // If the active value is technically "enabled" (or forced), we return it.
+        // But if ALL are disabled, we return empty string for the generated prompt?
+        // Let's stick to: Output the active value IF it is not effectively "off". 
+        // If the UI shows it as "dimmed/off", it shouldn't be in the prompt.
+        if (options.length > 0 && options.every((_, i) => disabled.includes(i))) {
+            return ''; // All disabled -> No output
+        }
+        return s.activeValue || '';
+    }
     return ''; 
   }).join('');
 
@@ -723,7 +745,7 @@ export default function App() {
       const newSegmentsSlice: Segment[] = [];
       if (rawBeforeText) newSegmentsSlice.push({ id: uuidv4(), type: 'text', content: rawBeforeText });
       const newRandomId = uuidv4();
-      newSegmentsSlice.push({ id: newRandomId, type: 'random' as SegmentType, content: [rawSelectedText.trim()], activeValue: rawSelectedText.trim() });
+      newSegmentsSlice.push({ id: newRandomId, type: 'random' as SegmentType, content: [rawSelectedText.trim()], activeValue: rawSelectedText.trim(), disabledIndices: [] });
       if (rawAfterText) newSegmentsSlice.push({ id: uuidv4(), type: 'text', content: rawAfterText });
 
       const result = [...prev];
@@ -738,20 +760,39 @@ export default function App() {
     setSelection({ startId: null, endId: null, startOffset: 0, endOffset: 0, text: '' });
   };
 
-  const updateRandomOptions = (newOptions: string[]) => {
+  const updateRandomOptions = (newOptions: string[], newDisabledIndices: number[]) => {
     if (editingSegmentId) {
         // Editing a block on the canvas
         const newSegments = segments.map(s => {
           if (s.id === editingSegmentId) {
             let newActive = s.activeValue;
-            if (!newActive || !newOptions.includes(newActive)) newActive = newOptions.length > 0 ? newOptions[0] : '';
-            return { ...s, content: newOptions, activeValue: newActive };
+            
+            // Check if active value is now disabled or removed
+            const activeIndex = newOptions.indexOf(newActive || '');
+            const isActiveDisabled = activeIndex !== -1 && newDisabledIndices.includes(activeIndex);
+            const isRemoved = activeIndex === -1;
+
+            if (isRemoved || isActiveDisabled) {
+                // Find first enabled option
+                const firstEnabledIndex = newOptions.findIndex((_, idx) => !newDisabledIndices.includes(idx));
+                if (firstEnabledIndex !== -1) {
+                    newActive = newOptions[firstEnabledIndex];
+                } else {
+                    // All disabled? Keep first one but it will be rendered dim
+                    newActive = newOptions.length > 0 ? newOptions[0] : '';
+                }
+            }
+            
+            return { ...s, content: newOptions, activeValue: newActive, disabledIndices: newDisabledIndices };
           }
           return s;
         });
         updateSegments(newSegments);
     } else if (editingPresetId) {
         // Editing a preset in the folder
+        // Note: For presets, we currently just store the list of strings.
+        // If we want to store enabled state in presets, OptionPreset interface needs update.
+        // For now, we'll just save the text options and ignore disabled state for library presets to keep them simple.
         setOptionPresets(prev => prev.map(p => {
             if (p.id === editingPresetId) {
                 return { ...p, options: newOptions };
@@ -800,7 +841,8 @@ export default function App() {
           id: uuidv4(),
           type: 'random',
           content: [...preset.options],
-          activeValue: activeVal
+          activeValue: activeVal,
+          disabledIndices: []
       };
       
       let newSegments = [...segments];
@@ -858,7 +900,8 @@ export default function App() {
       const newSeg: Segment = {
           ...segments[index],
           content: [...preset.options],
-          activeValue: activeVal
+          activeValue: activeVal,
+          disabledIndices: [] // Reset disabled state on replacement
       };
       
       const newSegments = [...segments];
@@ -958,7 +1001,15 @@ export default function App() {
     setTimeout(() => {
       const next = segments.map(seg => {
         if (seg.type === 'random' && Array.isArray(seg.content) && seg.content.length > 0) {
-          return { ...seg, activeValue: getRandom(seg.content) };
+          // Filter out disabled options
+          const disabled = seg.disabledIndices || [];
+          const enabledOptions = seg.content.filter((_, i) => !disabled.includes(i));
+          
+          if (enabledOptions.length > 0) {
+              return { ...seg, activeValue: getRandom(enabledOptions) };
+          }
+          // If all disabled, keep current or first (it will be rendered dim anyway)
+          return seg;
         }
         return seg;
       });
@@ -1306,6 +1357,11 @@ export default function App() {
       e.stopPropagation();
       if (confirm('Delete project?')) {
           setSavedProjects(prev => prev.filter(p => p.id !== id));
+          // FIX: If we delete the current project, detach the workspace so next save works correctly
+          if (currentProjectId === id) {
+              setCurrentProjectId(null);
+              showNotification("Project Deleted (Workspace Unsaved)");
+          }
       }
   };
   
@@ -1404,15 +1460,23 @@ export default function App() {
   
   // Logic to determine what to show in the RandomizerEditor modal
   const isEditorOpen = !!editingSegmentId || !!editingPresetId;
-  const currentEditingOptions = useMemo(() => {
+  const currentEditingData = useMemo(() => {
       if (editingSegmentId) {
           const seg = segments.find(s => s.id === editingSegmentId);
-          return seg && Array.isArray(seg.content) ? seg.content as string[] : [];
+          if (seg && Array.isArray(seg.content)) {
+              return { 
+                  options: seg.content as string[], 
+                  disabledIndices: seg.disabledIndices || [] 
+              };
+          }
       } else if (editingPresetId) {
           const preset = optionPresets.find(p => p.id === editingPresetId);
-          return preset ? preset.options : [];
+          if (preset) {
+              // Presets currently don't store disabled state, so assume all enabled
+              return { options: preset.options, disabledIndices: [] };
+          }
       }
-      return [];
+      return { options: [], disabledIndices: [] };
   }, [editingSegmentId, editingPresetId, segments, optionPresets]);
   
   const handleCloseEditor = () => {
@@ -1539,6 +1603,7 @@ export default function App() {
                         );
                     } else {
                         const isSelected = selectedOptionId === seg.id;
+                        const allDisabled = Array.isArray(seg.content) && seg.content.length > 0 && seg.content.every((_, i) => seg.disabledIndices?.includes(i));
                         return (
                         <span
                             key={seg.id}
@@ -1547,11 +1612,12 @@ export default function App() {
                             onClick={(e) => { e.stopPropagation(); setSelectedOptionId(seg.id); }}
                             className={`inline-flex items-center align-baseline mx-1 my-0.5 rounded border select-none group/opt relative shadow-sm transition-all hover:bg-canvas-800/80
                                 ${isSelected ? 'border-brand-500 bg-brand-900/20 ring-1 ring-brand-500/50' : 'border-canvas-700 bg-canvas-800 hover:border-brand-500/50 hover:shadow-brand-500/10'}
+                                ${allDisabled ? 'opacity-50 grayscale' : ''}
                             `}
                         >
                             {/* Value Display */}
                             <span 
-                                className="px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm"
+                                className={`px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm ${allDisabled ? 'text-canvas-500' : ''}`}
                                 title={`Options: ${(seg.content as string[]).join(', ')}`}
                             >
                                 {seg.activeValue || '(empty)'}
@@ -1702,7 +1768,11 @@ export default function App() {
       {isEditorOpen && (
         <Modal isOpen={isEditorOpen} onClose={handleCloseEditor} title={editingPresetId ? "Edit Preset Options" : "Edit Block Options"}>
           <div className="space-y-6">
-             <RandomizerEditor options={currentEditingOptions} onSave={updateRandomOptions} />
+             <RandomizerEditor 
+                options={currentEditingData.options} 
+                disabledIndices={currentEditingData.disabledIndices}
+                onSave={updateRandomOptions} 
+             />
              {editingSegmentId && (
                 <div className="pt-4 border-t border-canvas-800 flex justify-end">
                     <button onClick={() => deleteSegment(editingSegmentId)} className="flex items-center gap-2 text-red-400 hover:text-red-300 text-xs px-3 py-2 rounded hover:bg-red-900/20 uppercase font-bold tracking-wider"><Trash2 size={14}/> Delete Block</button>

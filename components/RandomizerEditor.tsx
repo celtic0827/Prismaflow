@@ -1,13 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Sliders, Edit3, Copy, Check, X as XIcon } from './Icons';
+import { Plus, Trash2, Sliders, Edit3, Copy, Check, X as XIcon, CheckSquare, Square } from './Icons';
 
 interface RandomizerEditorProps {
   options: string[];
-  onSave: (newOptions: string[]) => void;
+  disabledIndices?: number[];
+  onSave: (newOptions: string[], newDisabledIndices: number[]) => void;
 }
 
-export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, onSave }) => {
-  const [items, setItems] = useState<string[]>(options);
+interface EditorItem {
+    text: string;
+    enabled: boolean;
+}
+
+export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, disabledIndices = [], onSave }) => {
+  // Initialize state merging options and disabled indices
+  const [items, setItems] = useState<EditorItem[]>(() => {
+      return options.map((opt, idx) => ({
+          text: opt,
+          enabled: !disabledIndices.includes(idx)
+      }));
+  });
+
   const [newItem, setNewItem] = useState('');
   
   // Inline Editing State
@@ -21,32 +34,58 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, onS
     }
   }, [editingIndex]);
 
+  // Helper to trigger save to parent
+  const triggerSave = (currentItems: EditorItem[]) => {
+      const newOptions = currentItems.map(i => i.text);
+      const newDisabled = currentItems
+          .map((item, idx) => item.enabled ? -1 : idx)
+          .filter(idx => idx !== -1);
+      onSave(newOptions, newDisabled);
+  };
+
   const handleAdd = () => {
     if (newItem.trim()) {
-      const updated = [...items, newItem.trim()];
+      const updated = [...items, { text: newItem.trim(), enabled: true }];
       setItems(updated);
       setNewItem('');
-      onSave(updated);
+      triggerSave(updated);
     }
   };
 
   const handleRemove = (index: number) => {
     const updated = items.filter((_, i) => i !== index);
     setItems(updated);
-    onSave(updated);
+    triggerSave(updated);
   };
 
   const handleDuplicate = (index: number) => {
       const itemToCopy = items[index];
+      // Clone the item state
       const updated = [...items];
-      updated.splice(index + 1, 0, itemToCopy);
+      updated.splice(index + 1, 0, { ...itemToCopy });
       setItems(updated);
-      onSave(updated);
+      triggerSave(updated);
+  };
+
+  const toggleEnabled = (index: number) => {
+      const updated = items.map((item, i) => 
+          i === index ? { ...item, enabled: !item.enabled } : item
+      );
+      setItems(updated);
+      triggerSave(updated);
+  };
+
+  const toggleAll = () => {
+      // If all are enabled, disable all. Otherwise, enable all.
+      const allEnabled = items.every(i => i.enabled);
+      const updated = items.map(i => ({ ...i, enabled: !allEnabled }));
+      setItems(updated);
+      triggerSave(updated);
   };
 
   const startEditing = (index: number) => {
       setEditingIndex(index);
-      setEditValue(items[index]);
+      setEditValue(items[index].text);
   };
 
   const cancelEditing = () => {
@@ -57,21 +96,35 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, onS
   const saveEditing = (index: number) => {
       if (editValue.trim()) {
           const updated = [...items];
-          updated[index] = editValue.trim();
+          updated[index] = { ...updated[index], text: editValue.trim() };
           setItems(updated);
-          onSave(updated);
+          triggerSave(updated);
       }
       setEditingIndex(null);
       setEditValue('');
   };
 
+  const isAllEnabled = items.length > 0 && items.every(i => i.enabled);
+  const isSomeEnabled = items.some(i => i.enabled);
+
   return (
     <div className="space-y-4 font-sans">
-      <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
-        <Sliders className="text-brand-400" size={18} />
-        <p className="text-xs text-brand-200">
-          Manage variations. Varia will randomly select one.
-        </p>
+      <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+            <Sliders className="text-brand-400" size={18} />
+            <p className="text-xs text-brand-200">
+            Manage variations. Uncheck to disable.
+            </p>
+        </div>
+        {items.length > 0 && (
+            <button 
+                onClick={toggleAll} 
+                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
+            >
+                {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
+                {isAllEnabled ? 'All On' : 'Toggle'}
+            </button>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -102,7 +155,7 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, onS
         {items.map((item, idx) => (
           <div 
             key={idx} 
-            className={`group flex items-center justify-between bg-canvas-900 border border-canvas-800 rounded px-3 py-2 transition-all ${editingIndex === idx ? 'border-brand-500 ring-1 ring-brand-500/50' : 'hover:border-canvas-600'}`}
+            className={`group flex items-center justify-between bg-canvas-900 border border-canvas-800 rounded pl-2 pr-3 py-2 transition-all ${editingIndex === idx ? 'border-brand-500 ring-1 ring-brand-500/50' : 'hover:border-canvas-600'} ${!item.enabled ? 'opacity-60' : ''}`}
           >
             {editingIndex === idx ? (
                 <div className="flex items-center gap-2 w-full">
@@ -122,8 +175,20 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, onS
                 </div>
             ) : (
                 <>
-                    <span className="text-sm font-mono text-canvas-200 break-all mr-2">{item}</span>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <button 
+                            onClick={() => toggleEnabled(idx)}
+                            className={`shrink-0 ${item.enabled ? 'text-brand-400 hover:text-brand-300' : 'text-canvas-600 hover:text-canvas-400'}`}
+                            title={item.enabled ? "Disable Item" : "Enable Item"}
+                        >
+                            {item.enabled ? <CheckSquare size={16} /> : <Square size={16} />}
+                        </button>
+                        <span className={`text-sm font-mono break-all cursor-pointer ${item.enabled ? 'text-canvas-200' : 'text-canvas-500 line-through decoration-canvas-700'}`} onClick={() => startEditing(idx)}>
+                            {item.text}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                          <button
                             onClick={() => startEditing(idx)}
                             className="text-canvas-500 hover:text-brand-400 p-1.5 hover:bg-canvas-800 rounded"

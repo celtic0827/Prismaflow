@@ -11,6 +11,8 @@ export interface Segment {
   content: string | string[]; 
   // For random segments: the currently selected option to display
   activeValue?: string;
+  // For random segments: indices of options that are temporarily disabled/ignored
+  disabledIndices?: number[];
   // For label segments: the highlight color
   color?: string;
 }

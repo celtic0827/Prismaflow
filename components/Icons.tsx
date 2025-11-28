@@ -40,7 +40,9 @@ import {
   LayoutTemplate,
   Library,
   Package,
-  HelpCircle
+  HelpCircle,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 
 export { 
@@ -84,5 +86,7 @@ export {
   LayoutTemplate,
   Library,
   Package,
-  HelpCircle
+  HelpCircle,
+  CheckSquare,
+  Square
 };
