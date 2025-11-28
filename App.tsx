@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -1498,7 +1496,7 @@ export default function App() {
       </div>
       )}
 
-      {/* Help Button */}
+      {/* Help Button - Conditional render inside Modal check, but Button is always visible */}
       <button 
         onClick={() => setIsHelpModalOpen(true)}
         className="fixed top-6 right-6 p-2 text-canvas-500 hover:text-brand-400 transition-colors z-50 bg-canvas-900/50 rounded-full border border-canvas-800 hover:border-brand-500/50"
@@ -1785,64 +1783,70 @@ export default function App() {
         </Modal>
       )}
 
-      {/* Save Preset Modal */}
-      <Modal isOpen={isSavePresetModalOpen} onClose={() => setIsSavePresetModalOpen(false)} title="Save Option Preset">
-         <div className="space-y-4 font-sans">
-             <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
-                 <FolderPlus className="text-brand-400" size={18} />
-                 <p className="text-xs text-brand-200">
-                     Save the current options as a reusable preset.
-                 </p>
-             </div>
-             <div className="space-y-2">
-                 <label className="text-xs font-bold text-canvas-400 uppercase tracking-wider">Preset Name</label>
-                 <input 
-                     type="text" 
-                     value={presetNameInput}
-                     onChange={(e) => setPresetNameInput(e.target.value)}
-                     onKeyDown={(e) => e.key === 'Enter' && confirmSavePreset()}
-                     placeholder="e.g. Cyberpunk Characters"
-                     className="w-full bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                     autoFocus
-                 />
-             </div>
-             <div className="flex justify-end gap-2 pt-2">
-                 <button onClick={() => setIsSavePresetModalOpen(false)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
-                 <button onClick={confirmSavePreset} className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-bold shadow-lg shadow-brand-500/20">Save Preset</button>
-             </div>
-         </div>
-      </Modal>
+      {/* Save Preset Modal - Conditionally Rendered */}
+      {isSavePresetModalOpen && (
+        <Modal isOpen={isSavePresetModalOpen} onClose={() => setIsSavePresetModalOpen(false)} title="Save Option Preset">
+           <div className="space-y-4 font-sans">
+               <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
+                   <FolderPlus className="text-brand-400" size={18} />
+                   <p className="text-xs text-brand-200">
+                       Save the current options as a reusable preset.
+                   </p>
+               </div>
+               <div className="space-y-2">
+                   <label className="text-xs font-bold text-canvas-400 uppercase tracking-wider">Preset Name</label>
+                   <input 
+                       type="text" 
+                       value={presetNameInput}
+                       onChange={(e) => setPresetNameInput(e.target.value)}
+                       onKeyDown={(e) => e.key === 'Enter' && confirmSavePreset()}
+                       placeholder="e.g. Cyberpunk Characters"
+                       className="w-full bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                       autoFocus
+                   />
+               </div>
+               <div className="flex justify-end gap-2 pt-2">
+                   <button onClick={() => setIsSavePresetModalOpen(false)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
+                   <button onClick={confirmSavePreset} className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-bold shadow-lg shadow-brand-500/20">Save Preset</button>
+               </div>
+           </div>
+        </Modal>
+      )}
 
-      {/* Save Section Modal */}
-      <Modal isOpen={isSaveSectionModalOpen} onClose={() => setIsSaveSectionModalOpen(false)} title="Save Section to Library">
-         <div className="space-y-4 font-sans">
-             <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
-                 <LayoutTemplate className="text-brand-400" size={18} />
-                 <p className="text-xs text-brand-200">
-                     Save this section (Label + Content) to your library.
-                 </p>
-             </div>
-             <div className="space-y-2">
-                 <label className="text-xs font-bold text-canvas-400 uppercase tracking-wider">Section Name</label>
-                 <input 
-                     type="text" 
-                     value={presetNameInput}
-                     onChange={(e) => setPresetNameInput(e.target.value)}
-                     onKeyDown={(e) => e.key === 'Enter' && confirmSaveSection()}
-                     placeholder="e.g. Lighting Setup"
-                     className="w-full bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
-                     autoFocus
-                 />
-             </div>
-             <div className="flex justify-end gap-2 pt-2">
-                 <button onClick={() => setIsSaveSectionModalOpen(false)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
-                 <button onClick={confirmSaveSection} className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-bold shadow-lg shadow-brand-500/20">Save Section</button>
-             </div>
-         </div>
-      </Modal>
+      {/* Save Section Modal - Conditionally Rendered */}
+      {isSaveSectionModalOpen && (
+        <Modal isOpen={isSaveSectionModalOpen} onClose={() => setIsSaveSectionModalOpen(false)} title="Save Section to Library">
+           <div className="space-y-4 font-sans">
+               <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
+                   <LayoutTemplate className="text-brand-400" size={18} />
+                   <p className="text-xs text-brand-200">
+                       Save this section (Label + Content) to your library.
+                   </p>
+               </div>
+               <div className="space-y-2">
+                   <label className="text-xs font-bold text-canvas-400 uppercase tracking-wider">Section Name</label>
+                   <input 
+                       type="text" 
+                       value={presetNameInput}
+                       onChange={(e) => setPresetNameInput(e.target.value)}
+                       onKeyDown={(e) => e.key === 'Enter' && confirmSaveSection()}
+                       placeholder="e.g. Lighting Setup"
+                       className="w-full bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500"
+                       autoFocus
+                   />
+               </div>
+               <div className="flex justify-end gap-2 pt-2">
+                   <button onClick={() => setIsSaveSectionModalOpen(false)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
+                   <button onClick={confirmSaveSection} className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-bold shadow-lg shadow-brand-500/20">Save Section</button>
+               </div>
+           </div>
+        </Modal>
+      )}
 
-      {/* Help Modal */}
-      <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+      {/* Help Modal - Conditionally Rendered */}
+      {isHelpModalOpen && (
+        <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+      )}
     </div>
   );
 }

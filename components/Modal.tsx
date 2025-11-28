@@ -10,6 +10,9 @@ interface ModalProps {
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   useEffect(() => {
+    // Only lock scroll if modal is explicitly open
+    if (!isOpen) return;
+
     // Handle Escape key
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
