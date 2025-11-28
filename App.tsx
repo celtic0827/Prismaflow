@@ -1191,7 +1191,7 @@ export default function App() {
           updateSegments([...segments, ...pastedSegments]);
       } else {
           // Append
-          updateSegments([...segments, { id: uuidv4(), type: 'text', content: text }]);
+          updateSegments([...segments, { id: uuidv4(), type: 'text', content: text });
       }
   };
 
@@ -1340,8 +1340,8 @@ export default function App() {
     <div className="min-h-screen bg-canvas-950 flex flex-col items-center py-10 px-4 md:px-8">
       <input type="file" ref={fileInputRef} onChange={handleImportCSV} className="hidden" />
       
-      {/* Notifications */}
-      {notification && (
+      {/* Notifications - FIXED: Strictly conditional rendering to prevent ghost icon */}
+      {notification && notification.trim() !== '' && (
       <div className={`fixed top-6 left-1/2 -translate-x-1/2 bg-canvas-800 border border-brand-500/50 text-brand-100 px-6 py-3 rounded-full shadow-lg z-50 transition-all opacity-100 translate-y-0`}>
           <Zap size={14} className="inline mr-2" />{notification}
       </div>
@@ -1365,7 +1365,8 @@ export default function App() {
 
       <main className="w-full max-w-7xl flex flex-col lg:flex-row gap-6 items-start h-[calc(100vh-200px)]">
         <div className="flex-1 w-full min-w-0 flex flex-col h-full gap-4">
-            <div className="bg-canvas-900 border border-canvas-800 rounded-lg px-4 py-2 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
+            {/* Toolbar - FIXED: Consistent px-3 py-2 padding, smaller text */}
+            <div className="bg-canvas-900 border border-canvas-800 rounded-lg px-3 py-2 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
                 <div className="flex-1 w-full md:w-auto flex gap-2 items-center">
                     <input type="text" value={promptName} onChange={e => setPromptName(e.target.value)} className="bg-transparent text-sm font-bold text-white w-full focus:outline-none" placeholder="Untitled Project" />
                     {currentProjectId && <span className={`text-[10px] px-2 py-0.5 rounded-full border ${!isDirty ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-400'}`}>{!isDirty ? 'Synced' : 'Edited'}</span>}
@@ -1458,28 +1459,31 @@ export default function App() {
                         >
                             {/* Value Display */}
                             <span 
-                                className="px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm border-r border-transparent group-hover/opt:border-canvas-700"
+                                className="px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm"
                                 title={`Options: ${(seg.content as string[]).join(', ')}`}
                             >
                                 {seg.activeValue || '(empty)'}
                             </span>
                             
-                            {/* Actions - Visible on Hover */}
-                            <span className="flex items-center w-0 overflow-hidden group-hover/opt:w-auto transition-all bg-canvas-900">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); setEditingSegmentId(seg.id); }}
-                                    className="p-1.5 hover:bg-brand-600 hover:text-white text-canvas-400 transition-colors"
-                                    title="Edit Options"
-                                >
-                                    <Edit3 size={12} />
-                                </button>
-                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); deleteSegment(seg.id); }}
-                                    className="p-1.5 hover:bg-red-500 hover:text-white text-canvas-400 transition-colors"
-                                    title="Delete Block"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
+                            {/* Actions - Floating Bubble (Absolute Positioning) */}
+                            {/* FIX: Hit area bridge. Container padded bottom to reach the parent block */}
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full pb-1.5 z-50 hidden group-hover/opt:flex justify-center animate-in fade-in zoom-in-95 duration-100 pointer-events-none group-hover/opt:pointer-events-auto">
+                                <span className="bg-canvas-900 border border-canvas-700 rounded shadow-xl flex items-center gap-1 px-2 py-1 min-w-[80px] justify-center pointer-events-auto">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setEditingSegmentId(seg.id); }}
+                                        className="p-1 hover:bg-brand-600 hover:text-white text-canvas-400 transition-colors rounded"
+                                        title="Edit Options"
+                                    >
+                                        <Edit3 size={14} />
+                                    </button>
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); deleteSegment(seg.id); }}
+                                        className="p-1 hover:bg-red-500 hover:text-white text-canvas-400 transition-colors rounded"
+                                        title="Delete Block"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </span>
                             </span>
                         </span>
                         );
@@ -1488,7 +1492,8 @@ export default function App() {
             </div>
 
             <div className="bg-canvas-950 border border-canvas-800 rounded-lg flex flex-col shrink-0 min-h-[140px]">
-                <div className="bg-canvas-900/50 px-4 py-2 border-b border-canvas-800 flex justify-between items-center">
+                {/* Generated Prompt Header - FIXED: Consistent px-3 py-2 padding */}
+                <div className="bg-canvas-900/50 px-3 py-2 border-b border-canvas-800 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs text-canvas-500 font-bold uppercase tracking-widest"><Terminal size={14}/> Generated Prompt</div>
                     <div className="flex items-center gap-2">
                          <button onClick={handleReroll} className={`p-1.5 rounded bg-brand-600 hover:bg-brand-500 text-white shadow-lg ${isRerolling ? 'animate-spin':''}`}><RefreshCw size={16}/></button>
@@ -1504,7 +1509,7 @@ export default function App() {
         {/* Tabbed Sidebar */}
         <div className="w-full lg:w-72 flex-shrink-0 h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden">
              
-             {/* Tab Header */}
+             {/* Tab Header - FIXED: Consistent py-2 padding */}
              <div className="flex shrink-0 border-b border-canvas-800">
                 <button 
                     onClick={() => setActiveSidebarTab('library')}
@@ -1525,6 +1530,7 @@ export default function App() {
                  <div className="flex-1 overflow-hidden flex flex-col">
                      {/* 1. Option Presets */}
                      <div className="flex-1 min-h-0 flex flex-col border-b border-canvas-800">
+                         {/* Library Headers - FIXED: Consistent px-3 py-2 padding */}
                          <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between">
                             <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><Folder size={12}/> Options</h4>
                             <button 
@@ -1556,6 +1562,7 @@ export default function App() {
 
                      {/* 2. Section Presets */}
                      <div className="flex-1 min-h-0 flex flex-col">
+                         {/* Library Headers - FIXED: Consistent px-3 py-2 padding */}
                          <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between border-t border-canvas-800">
                             <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><LayoutTemplate size={12}/> Sections</h4>
                             {/* Save handled via Label Menu */}

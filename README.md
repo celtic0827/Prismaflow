@@ -1,5 +1,7 @@
 # Prismaflow: Modular Prompt Studio
 
+![Prismaflow Interface](https://upload.cc/i1/2025/11/28/zY90Qu.jpg)
+
 > **Structure. Randomize. Flow.**
 
 **Prismaflow** is a professional prompt engineering environment designed for "Controlled Variance". It transforms linear text into a modular structure, allowing creators to build complex, reusable prompt templates with precision.
