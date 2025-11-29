@@ -60,6 +60,9 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(labelName);
   const [position, setPosition] = useState<{top: number, left: number} | null>(null);
+  
+  // Track window width to differentiate between keyboard open (height change) and actual resize/orientation change
+  const lastWidth = useRef(typeof window !== 'undefined' ? window.innerWidth : 0);
 
   useEffect(() => {
     if (isOpen) {
@@ -110,12 +113,23 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-        const handleScroll = () => onClose();
-        window.addEventListener('scroll', handleScroll, true);
-        window.addEventListener('resize', handleScroll);
+        const handleResize = () => {
+            // Mobile keyboard triggers resize (height change), but width usually stays same.
+            // Only close if width changes significantly (e.g. orientation change or desktop resize)
+            if (Math.abs(window.innerWidth - lastWidth.current) > 20) {
+                 onClose();
+            }
+            lastWidth.current = window.innerWidth;
+        };
+
+        // Removed the scroll listener ("window.addEventListener('scroll', ...)") because
+        // on mobile, focusing the input often automatically scrolls the viewport,
+        // which was causing the menu to close immediately.
+        
+        window.addEventListener('resize', handleResize);
+        
         return () => {
-            window.removeEventListener('scroll', handleScroll, true);
-            window.removeEventListener('resize', handleScroll);
+            window.removeEventListener('resize', handleResize);
         };
     }
   }, [isOpen, onClose]);
@@ -134,7 +148,7 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   const handleSaveRename = (e?: React.MouseEvent | React.KeyboardEvent) => {
     e?.stopPropagation();
     onRename(editValue.trim()); 
-    setIsEditing(false);
+    // Note: The parent component update will trigger useEffect above to set isEditing(false)
   };
 
   if (!isOpen || !position) return null;
