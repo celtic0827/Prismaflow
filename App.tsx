@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -442,8 +441,9 @@ export default function App() {
 
   // Global click handler to deselect sidebar items
   const handleGlobalClick = () => {
-    setSelectedLibraryOptionId(null);
-    setSelectedSidebarProjectId(null);
+    // Disabled global deselection to persist Library selection while editing on canvas
+    // setSelectedLibraryOptionId(null);
+    // setSelectedSidebarProjectId(null);
   };
   
   const updateSegments = (newSegments: Segment[], shouldSaveSnapshot = true) => {
@@ -468,19 +468,54 @@ export default function App() {
   };
 
   // --- Derived ---
-  const resultPrompt = segments.map(s => {
-    if (s.type === 'text') return s.content;
-    if (s.type === 'random') {
-        const disabled = s.disabledIndices || [];
-        const options = s.content as string[];
-        // Output the active value IF it is not effectively "off". 
-        if (options.length > 0 && options.every((_, i) => disabled.includes(i))) {
-            return ''; // All disabled -> No output
+  const resultPrompt = useMemo(() => {
+    let prompt = '';
+    // Filter out labels first to see the flow of content for logical comma placement
+    const contentSegments = segments.filter(s => s.type !== 'label');
+    
+    contentSegments.forEach((seg, idx) => {
+        let text = '';
+        if (seg.type === 'text') {
+            text = seg.content as string;
+        } else if (seg.type === 'random') {
+            const disabled = seg.disabledIndices || [];
+            const options = seg.content as string[];
+            // Logic for active value
+            let val = '';
+            if (options.length > 0 && !options.every((_, i) => disabled.includes(i))) {
+                val = seg.activeValue || '';
+            }
+            
+            if (val) {
+                text = val;
+                // Auto-Comma Logic:
+                // If the block produces a value, check the NEXT content segment.
+                // If it's NOT punctuation, add a comma.
+                const next = contentSegments[idx + 1];
+                let addComma = true;
+                
+                if (!next) {
+                    // End of prompt. Don't add comma.
+                    addComma = false;
+                } else if (next.type === 'text') {
+                    const nextContent = next.content as string;
+                    // Check if next text starts with punctuation (ignoring whitespace)
+                    // Matches: . , ; ? !
+                    if (/^\s*[.,;?!]/.test(nextContent)) {
+                        addComma = false;
+                    }
+                }
+                // If next is another block (type 'random'), addComma remains true.
+                
+                if (addComma) {
+                    text += ', '; 
+                }
+            }
         }
-        return s.activeValue || '';
-    }
-    return ''; 
-  }).join('');
+        prompt += text;
+    });
+    return prompt;
+  }, [segments]);
 
   const isDirty = useMemo(() => {
     if (!currentProjectId) return true;
@@ -1050,9 +1085,6 @@ export default function App() {
     // Note: Option blocks now handle their own clicks via stopPropagation to set selection
     if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('[contenteditable="false"]')) return;
-
-    // Clear Option selection if clicking background
-    setSelectedOptionId(null);
 
     // FIX: If the user has selected text (Range), do not force-move the cursor.
     // This happens when a user drags to select text and releases mouse (triggering click).
