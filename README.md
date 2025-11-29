@@ -27,6 +27,16 @@
 
 ---
 
+## 💾 Data Storage & Backup
+
+**Important:** Prismaflow operates entirely within your browser (Client-Side).
+
+*   **Local Storage:** All your projects and settings are stored locally in your browser. No data is sent to any external server, ensuring complete privacy.
+*   **Data Safety:** **Clearing your browser cache or site data will permanently delete your saved projects.**
+*   **Backup & Transfer:** To keep your data safe or move it to another device, regularly use the **Export Backup** feature (Download icon) in the toolbar. This saves your entire workspace as a `.json` file. You can restore it anytime using **Import Backup** (Upload icon).
+
+---
+
 ## 🛠 Tech Stack
 
 *   React 19

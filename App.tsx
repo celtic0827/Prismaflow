@@ -1579,8 +1579,8 @@ export default function App() {
                     <button onClick={handleSaveAsNew} className="p-1.5 text-canvas-400 hover:text-emerald-400 rounded" title="Save Copy"><FilePlus size={16}/></button>
                     
                     {/* Backup Controls */}
-                    <button onClick={handleExportBackup} className="p-1.5 text-canvas-400 hover:text-sky-400 rounded" title="Export Backup"><Upload size={16}/></button>
-                    <button onClick={handleImportClick} className="p-1.5 text-canvas-400 hover:text-purple-400 rounded" title="Import Backup"><Download size={16}/></button>
+                    <button onClick={handleExportBackup} className="p-1.5 text-canvas-400 hover:text-sky-400 rounded" title="Export Backup"><Download size={16}/></button>
+                    <button onClick={handleImportClick} className="p-1.5 text-canvas-400 hover:text-purple-400 rounded" title="Import Backup"><Upload size={16}/></button>
                     
                     <div className="w-px h-4 bg-canvas-800 mx-2"></div>
                     <button onClick={handleClear} className="p-1.5 text-canvas-400 hover:text-red-400 rounded" title="Clear"><Trash2 size={16}/></button>

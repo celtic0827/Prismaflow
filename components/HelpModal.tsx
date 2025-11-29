@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Modal } from './Modal';
-import { Layers, Tag, Sliders, Folder, LayoutTemplate, Zap, MousePointer2 } from './Icons';
+import { Layers, Tag, Sliders, Folder, LayoutTemplate, Zap, MousePointer2, Save } from './Icons';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -75,6 +75,27 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                 <p className="text-xs text-canvas-400">
                   Save entire sections (Label + Content) to the Library. 
                   Great for storing complex setups like "Cinematic Lighting" or "Negative Prompts".
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Data & Safety */}
+        <div className="space-y-4">
+          <h3 className="text-white font-bold uppercase tracking-widest text-xs border-b border-canvas-800 pb-2">Data & Storage</h3>
+          
+          <div className="grid gap-4">
+            <div className="flex gap-3">
+              <div className="bg-canvas-800 p-2 rounded h-fit text-sky-400"><Save size={18}/></div>
+              <div>
+                <h4 className="text-white font-bold text-xs mb-1">Local Storage Only</h4>
+                <p className="text-xs text-canvas-400 mb-2">
+                  All data is stored in your browser's local storage. We do not sync to the cloud.
+                  <strong className="text-red-400 block mt-1">Clearing browser cache will delete your projects.</strong>
+                </p>
+                <p className="text-xs text-canvas-400">
+                  Regularly use the <strong>Export Backup</strong> button in the toolbar to save a <code className="bg-canvas-900 px-1 rounded">.json</code> file of your work.
                 </p>
               </div>
             </div>
