@@ -58,8 +58,6 @@ import {
   Grid,
   Film,
   Feather,
-  Smile,
-  Skull,
   Ghost,
   Cpu,
   Globe,
@@ -86,9 +84,7 @@ export const LABEL_ICONS: { [key: string]: any } = {
   'Monitor': Monitor,
   'Grid': Grid,
   'Film': Film,
-  'Feather': Feather,
-  'Smile': Smile,
-  'Skull': Skull
+  'Feather': Feather
 };
 
 export { 
@@ -149,8 +145,6 @@ export {
   Grid,
   Film,
   Feather,
-  Smile,
-  Skull,
   Ghost,
   Cpu,
   Globe,

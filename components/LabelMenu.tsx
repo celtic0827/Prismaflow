@@ -71,7 +71,7 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   useLayoutEffect(() => {
     if (isOpen && anchorRef.current) {
         const rect = anchorRef.current.getBoundingClientRect();
-        const MENU_WIDTH = 320; // w-80
+        const MENU_WIDTH = 288; // w-72
         const GAP = 8;
         const SCREEN_MARGIN = 16;
         
@@ -142,7 +142,7 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   return createPortal(
     <div 
       ref={menuRef}
-      className="fixed z-[9999] w-80 bg-canvas-900 border border-canvas-700 rounded-xl shadow-2xl shadow-black/80 font-sans text-sm animate-in fade-in zoom-in-95 duration-100 flex flex-col"
+      className="fixed z-[9999] w-72 bg-canvas-900 border border-canvas-700 rounded-xl shadow-2xl shadow-black/80 font-sans text-sm animate-in fade-in zoom-in-95 duration-100 flex flex-col"
       style={{ top: position.top, left: position.left }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -185,12 +185,12 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
 
             {/* Visuals Row */}
             <div className="space-y-3">
-                 {/* Icons Grid (Compact 2 rows) */}
+                 {/* Icons Grid (Compact 3 rows of 6 cols) */}
                  <div>
                     <div className="flex items-center justify-between mb-1.5 px-1">
                         <span className="text-[10px] text-canvas-500 uppercase font-bold tracking-wider">Icon</span>
                     </div>
-                    <div className="grid grid-cols-10 gap-1">
+                    <div className="grid grid-cols-6 gap-1">
                         {Object.entries(LABEL_ICONS).map(([key, IconComponent]) => (
                             <button
                                 key={key}
