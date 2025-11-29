@@ -1,18 +1,19 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const apiKey = process.env.API_KEY;
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-
 export interface GenerateOptionsResult {
   options: string[];
   error?: string;
 }
 
 export async function generateCreativeOptions(userPrompt: string, count: number = 5, currentContext: string[] = []): Promise<GenerateOptionsResult> {
-  if (!ai) {
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
     return { options: [], error: "API Key not configured." };
   }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     // Construct a prompt that includes the user's request and potentially some context

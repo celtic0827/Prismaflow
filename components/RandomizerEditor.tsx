@@ -64,6 +64,19 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   const handleAiGenerate = async () => {
       if (!aiPrompt.trim()) return;
       
+      // Check and request API Key if needed
+      if (typeof window !== 'undefined' && (window as any).aistudio) {
+        const aistudio = (window as any).aistudio;
+        try {
+            const hasKey = await aistudio.hasSelectedApiKey();
+            if (!hasKey) {
+                await aistudio.openSelectKey();
+            }
+        } catch (e) {
+            console.error("API Key selection error:", e);
+        }
+      }
+      
       setIsAiLoading(true);
       setAiError(null);
       
@@ -72,13 +85,16 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
       
       if (result.error) {
           setAiError(result.error);
+          // If the error suggests key issues, offer a retry link
+          if (result.error.includes("API Key") && typeof window !== 'undefined' && (window as any).aistudio) {
+               // Optional: Trigger select again on next click or provide UI hint
+          }
       } else if (result.options.length > 0) {
           const newItems = result.options.map(opt => ({ text: opt, enabled: true }));
           const updated = [...items, ...newItems];
           setItems(updated);
           triggerSave(updated);
           setAiPrompt(''); // Clear prompt on success
-          // Optional: Keep AI mode open for more generation, or close it. Keeping it open is usually better flow.
       }
       
       setIsAiLoading(false);
@@ -211,6 +227,14 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
                 <p className="text-[10px] text-purple-300/50 px-1 italic">
                     Tip: Describe what you want, and AI will generate exactly {aiCount} options.
                 </p>
+                {aiError && aiError.includes("API Key") && (
+                     <button 
+                        onClick={() => typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey()} 
+                        className="text-[10px] text-brand-400 underline hover:text-brand-300 block mt-1"
+                     >
+                        Configure API Key
+                     </button>
+                )}
             </div>
           </div>
       )}
