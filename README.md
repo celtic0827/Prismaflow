@@ -19,11 +19,12 @@
 
 ### 2. Asset Library
 *   **Presets:** Save common lists (like "Camera Angles" or "Art Styles") to your personal library for quick access.
-*   **Section Templates:** Save entire prompt sections, including labels and options, to reuse complex setups across projects.
+*   **Section Templates:** Save entire prompt sections to reuse complex setups across projects.
 
 ### 3. Organized Workflow
-*   **Labels:** Use color-coded labels to group parts of your prompt (Subject, Lighting, Style).
-*   **Smart Editing:** Move, duplicate, or delete entire sections easily.
+*   **Visual Labels:** Group prompt segments with customizable **colors** and **icons** for better readability.
+*   **Smart Formatting:** Automatically handles punctuation and spacing between blocks for a natural text flow.
+*   **Mobile Optimized:** Fully functional interface designed for both desktop and mobile creators.
 
 ---
 

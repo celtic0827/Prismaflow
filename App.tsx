@@ -439,6 +439,15 @@ export default function App() {
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Sorting ---
+  const sortedOptionPresets = useMemo(() => {
+    return [...optionPresets].sort((a, b) => a.name.localeCompare(b.name));
+  }, [optionPresets]);
+
+  const sortedSectionPresets = useMemo(() => {
+    return [...sectionPresets].sort((a, b) => a.name.localeCompare(b.name));
+  }, [sectionPresets]);
+
   // --- Actions ---
 
   // Global click handler to deselect sidebar items
@@ -1807,7 +1816,7 @@ export default function App() {
 
                                 {/* Actions for Selected Preset */}
                                 <button 
-                                    onClick={() => { const p = optionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleInsertPreset(p); }}
+                                    onClick={() => { const p = sortedOptionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleInsertPreset(p); }}
                                     disabled={!selectedLibraryOptionId}
                                     className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
                                     title="Insert Selected"
@@ -1815,7 +1824,7 @@ export default function App() {
                                     <ClipboardPaste size={14}/>
                                 </button>
                                 <button 
-                                    onClick={() => { const p = optionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleReplacePreset(p); }}
+                                    onClick={() => { const p = sortedOptionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleReplacePreset(p); }}
                                     disabled={!selectedLibraryOptionId || !selectedOptionId}
                                     className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
                                     title="Swap with Selected Block"
@@ -1846,8 +1855,8 @@ export default function App() {
                              className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar"
                              onClick={() => setSelectedLibraryOptionId(null)} // Click empty space to deselect
                          >
-                             {optionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No options saved</div>}
-                             {optionPresets.map(preset => (
+                             {sortedOptionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No options saved</div>}
+                             {sortedOptionPresets.map(preset => (
                                 <div 
                                     key={preset.id} 
                                     onClick={(e) => { e.stopPropagation(); setSelectedLibraryOptionId(preset.id === selectedLibraryOptionId ? null : preset.id); }}
@@ -1874,8 +1883,8 @@ export default function App() {
                             {/* Save handled via Label Menu */}
                          </div>
                          <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
-                             {sectionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No sections saved</div>}
-                             {sectionPresets.map(preset => (
+                             {sortedSectionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No sections saved</div>}
+                             {sortedSectionPresets.map(preset => (
                                 <div key={preset.id} className="group border border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800 rounded-md p-2 transition-all flex items-center justify-between">
                                     <div className="overflow-hidden">
                                         <span className="text-xs font-bold text-canvas-300 group-hover:text-white truncate block">{preset.name}</span>
@@ -1932,7 +1941,7 @@ export default function App() {
                      </div>
                      
                      <div 
-                         className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 pb-32"
+                         className={`p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 ${savedProjects.length > 0 ? 'pb-32' : ''}`}
                          onClick={() => setSelectedSidebarProjectId(null)} // Click empty space to deselect
                      >
                          {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full text-canvas-600 space-y-3 text-center p-4 mt-10"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}

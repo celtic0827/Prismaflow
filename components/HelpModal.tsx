@@ -44,8 +44,8 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
               <div>
                 <h4 className="text-white font-bold text-xs mb-1">Labels & Sections</h4>
                 <p className="text-xs text-canvas-400">
-                  Use Labels to organize long prompts into logical sections (e.g., <code className="bg-canvas-900 px-1 rounded">#Lighting</code>).
-                  Click a Label to rename, change color, or move the entire section up/down.
+                  Organize your prompt with <span className="text-white">Labels</span>. 
+                  Click a label to rename, change its <strong>icon</strong> or <strong>color</strong>, and move entire sections.
                 </p>
               </div>
             </div>
@@ -107,6 +107,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           <h3 className="text-white font-bold uppercase tracking-widest text-xs border-b border-canvas-800 pb-2">Interaction</h3>
           <ul className="space-y-2 text-xs text-canvas-400 list-disc pl-4">
             <li><span className="text-white">Click</span> an Option Block to select it.</li>
+            <li><span className="text-white">Click</span> a Label to customize settings.</li>
             <li><span className="text-white">Hover</span> an Option Block to Edit or Delete.</li>
             <li><span className="text-white">Double Click</span> text to select words.</li>
             <li>Use the <span className="text-white">Sidebar</span> tabs to switch between your Library and Saved Projects.</li>
