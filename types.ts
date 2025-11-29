@@ -50,28 +50,3 @@ export interface SectionPreset {
   name: string;
   data: Segment[];
 }
-
-export const groupSegments = (segments: Segment[]): SectionGroup[] => {
-  const groups: SectionGroup[] = [];
-  let currentGroup: SectionGroup = { contentSegments: [] };
-
-  segments.forEach(seg => {
-    if (seg.type === 'label') {
-      // Push previous group if it has content or a label
-      if (currentGroup.labelSegment || currentGroup.contentSegments.length > 0) {
-        groups.push(currentGroup);
-      }
-      // Start new group
-      currentGroup = { labelSegment: seg, contentSegments: [] };
-    } else {
-      currentGroup.contentSegments.push(seg);
-    }
-  });
-
-  // Push final group
-  if (currentGroup.labelSegment || currentGroup.contentSegments.length > 0) {
-    groups.push(currentGroup);
-  }
-
-  return groups;
-};

@@ -2,52 +2,22 @@
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  Sparkles, 
-  Layers, 
-  RefreshCw, 
-  Copy, 
-  Zap, 
-  Trash2,
-  Tag,
-  Download,
-  Upload,
-  FilePlus,
-  Save,
-  Book,
-  Clock,
-  X,
-  Undo2,
-  Check,
-  ClipboardPaste,
-  Command,
-  Sliders,
-  Terminal,
-  Edit3,
-  Folder,
-  FolderPlus,
-  ArrowRightLeft,
-  Plus,
-  MousePointer2,
-  Settings,
-  Library,
-  LayoutTemplate,
-  Package,
-  HelpCircle,
-  Type,
-  FolderOpen,
+  Layers, Zap, Trash2, Save, HelpCircle, Edit3, Type, Tag,
+  FolderPlus, LayoutTemplate,
   LABEL_ICONS // Import label icon map
 } from './components/Icons';
-import { Segment, SelectionState, groupSegments, SectionGroup, SavedProject, SegmentType, OptionPreset, SectionPreset } from './types';
+import { Segment, SelectionState, SavedProject, SegmentType, OptionPreset, SectionPreset } from './types';
+import { normalizeSegments, getRandom, copyToClipboard, groupSegments } from './utils';
+
+// Components
 import { Modal } from './components/Modal';
 import { RandomizerEditor } from './components/RandomizerEditor';
 import { LabelMenu } from './components/LabelMenu';
 import { HelpModal } from './components/HelpModal';
-
-// Helper to get random item from array
-const getRandom = (arr: string[]) => {
-  if (!arr || arr.length === 0) return '';
-  return arr[Math.floor(Math.random() * arr.length)];
-};
+import { EditableSpan } from './components/EditableSpan';
+import { Toolbar } from './components/Toolbar';
+import { Sidebar } from './components/Sidebar';
+import { PromptOutput } from './components/PromptOutput';
 
 // Custom MIME type for internal copy/paste
 const ALCHEMIST_MIME_TYPE = 'application/x-prismaflow-fragment';
@@ -71,257 +41,10 @@ const PROJECTS_KEY = 'prismaflow_saved_projects';
 const OPTION_PRESETS_KEY = 'prismaflow_option_presets';
 const SECTION_PRESETS_KEY = 'prismaflow_section_presets';
 
-// --- Clipboard Helper ---
-const copyToClipboard = async (text: string): Promise<boolean> => {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (err) {
-    try {
-      // Fallback for older browsers or restricted contexts
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      
-      // Ensure it's not visible but part of DOM
-      textArea.style.position = "fixed";
-      textArea.style.left = "-9999px";
-      textArea.style.top = "0";
-      document.body.appendChild(textArea);
-      
-      textArea.focus();
-      textArea.select();
-      
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      return successful;
-    } catch (fallbackErr) {
-      console.error('Copy failed', fallbackErr);
-      return false;
-    }
-  }
-};
-
-// --- Normalization Helper ---
-// Ensures Text segments always surround Blocks (Labels/Randoms) to prevent cursor trapping.
-// IMPORTANT: Must ALWAYS clone objects to prevent state mutation affecting Undo history.
-const normalizeSegments = (segments: Segment[]): Segment[] => {
-  if (!segments || segments.length === 0) {
-    return [{ id: uuidv4(), type: 'text', content: '' }];
-  }
-
-  const normalized: Segment[] = [];
-  
-  // Ensure start is text
-  if (segments[0].type !== 'text') {
-    normalized.push({ id: uuidv4(), type: 'text', content: '' });
-  }
-
-  for (let i = 0; i < segments.length; i++) {
-    // CLONE the segment to ensure immutability
-    const current = { ...segments[i] };
-    
-    // If we have two text segments adjacent, merge them
-    if (normalized.length > 0 && 
-        normalized[normalized.length - 1].type === 'text' && 
-        current.type === 'text') {
-        const prev = normalized[normalized.length - 1];
-        
-        // FIX: Do not merge if the previous segment ends with a newline OR if current starts with newline.
-        // This ensures that 'abc\n' and 'next' remain separate segments, 
-        // giving 'next' its own DOM element on the new line for stable cursor placement.
-        const prevText = prev.content as string;
-        const currText = current.content as string;
-
-        if (!prevText.endsWith('\n') && !currText.startsWith('\n')) {
-            // Mutating 'prev' is safe here because 'prev' is already a clone created in this loop
-            prev.content = prevText + currText;
-            continue;
-        }
-    }
-
-    normalized.push(current);
-
-    // If current is Block, ensure next is Text.
-    const isCurrentBlock = current.type !== 'text';
-    const next = segments[i + 1];
-    const isNextBlock = !next || next.type !== 'text';
-
-    if (isCurrentBlock && isNextBlock) {
-      normalized.push({ id: uuidv4(), type: 'text', content: '' });
-    }
-  }
-
-  // Double check last is text
-  if (normalized.length === 0 || normalized[normalized.length - 1].type !== 'text') {
-      normalized.push({ id: uuidv4(), type: 'text', content: '' });
-  } else {
-      // FIX: If the very last text segment ends with a newline, append a new empty segment.
-      // This ensures the new line created by that newline is clickable/accessible.
-      const last = normalized[normalized.length - 1];
-      if (last.type === 'text' && (last.content as string).endsWith('\n')) {
-          normalized.push({ id: uuidv4(), type: 'text', content: '' });
-      }
-  }
-
-  return normalized;
-};
-
-
-interface EditableSpanProps {
-  id: string;
-  value: string;
-  color?: string;
-  onChange: (id: string, text: string) => void;
-  onBlur: () => void;
-  onSplit: (cursorIndex: number) => void;
-  onDeleteBack: (id: string) => void;
-}
-
-// Inline editable span
-const EditableSpan: React.FC<EditableSpanProps> = ({ 
-  id, 
-  value, 
-  color,
-  onChange, 
-  onBlur,
-  onSplit,
-  onDeleteBack
-}) => {
-  const spanRef = useRef<HTMLSpanElement>(null);
-  const isComposing = useRef(false);
-  const lastCursorPos = useRef<number | null>(null);
-  
-  useLayoutEffect(() => {
-    if (!spanRef.current) return;
-    
-    if (spanRef.current.textContent !== value) {
-       spanRef.current.textContent = value;
-    }
-
-    // Conservative Cursor Restoration
-    if (document.activeElement === spanRef.current && !isComposing.current) {
-        // Only restore if we have a tracked position AND the current selection is completely invalid/missing
-        // We trust the browser's cursor placement for normal typing/clicking
-        if (lastCursorPos.current !== null) {
-             const sel = window.getSelection();
-             if (!sel || sel.rangeCount === 0 || 
-                 (sel.anchorNode !== spanRef.current && !spanRef.current.contains(sel.anchorNode))) {
-                try {
-                    const range = document.createRange();
-                    const textNode = spanRef.current.firstChild;
-                    const len = textNode?.textContent?.length || 0;
-                    const safeOffset = Math.min(lastCursorPos.current, len);
-                    
-                    if (textNode) {
-                        range.setStart(textNode, safeOffset);
-                    } else {
-                        range.setStart(spanRef.current, 0);
-                    }
-                    range.collapse(true);
-                    sel?.removeAllRanges();
-                    sel?.addRange(range);
-                } catch (e) { }
-             }
-        }
-    }
-  }, [value]); 
-
-  const handleInput = (e: React.FormEvent<HTMLSpanElement>) => {
-    if (isComposing.current) return;
-    
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-        lastCursorPos.current = sel.getRangeAt(0).startOffset;
-    }
-
-    const text = e.currentTarget.textContent || '';
-    onChange(id, text);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isComposing.current || e.nativeEvent.isComposing) return;
-
-    // Track cursor on navigation keys
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-        requestAnimationFrame(() => {
-            const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0) lastCursorPos.current = sel.getRangeAt(0).startOffset;
-        });
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && spanRef.current) {
-        const range = sel.getRangeAt(0);
-        let offset = range.startOffset;
-        // Handle container-based selection
-        if (range.startContainer === spanRef.current) {
-            offset = (range.startOffset === 0) ? 0 : (spanRef.current.textContent?.length || 0);
-        }
-        const len = spanRef.current.textContent?.length || 0;
-        offset = Math.min(offset, len);
-        
-        // When pressing enter, we want cursor to land on new line (index + 1)
-        lastCursorPos.current = offset + 1;
-        onSplit(offset);
-      }
-    } else if (e.key === 'Backspace') {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        if (range.collapsed && range.startOffset === 0) {
-          e.preventDefault();
-          onDeleteBack(id);
-        }
-      }
-    }
-  };
-
-  const handleMouseUp = () => {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
-          lastCursorPos.current = sel.getRangeAt(0).startOffset;
-      }
-  }
-
-  // FIX: Only strictly empty segments need the placeholder block.
-  // Segments with '\n' should remain inline so they properly break the line.
-  const isEmpty = !value || value.length === 0;
-  const needsPlaceholder = isEmpty;
-  
-  return (
-    <span
-      ref={spanRef}
-      data-segment-id={id}
-      contentEditable
-      suppressContentEditableWarning
-      onInput={handleInput}
-      onKeyDown={handleKeyDown}
-      onMouseUp={handleMouseUp}
-      onBlur={onBlur}
-      onCompositionStart={() => { isComposing.current = true; }}
-      onCompositionEnd={(e) => { 
-          isComposing.current = false; 
-          handleInput(e as unknown as React.FormEvent<HTMLSpanElement>); 
-      }}
-      className="outline-none font-mono text-sm md:text-base break-words transition-colors rounded-sm align-baseline focus:bg-white/5"
-      spellCheck={false}
-      style={{ 
-        whiteSpace: 'pre-wrap', // Strictly enforce pre-wrap to handle \n correctly
-        display: needsPlaceholder ? 'inline-block' : 'inline', 
-        minWidth: needsPlaceholder ? '2px' : undefined, // Visible width for empty placeholder
-        minHeight: needsPlaceholder ? '1.5em' : undefined, // Ensure empty lines have height
-        color: color || DEFAULT_TEXT_COLOR 
-      }} 
-    />
-  );
-};
 
 export default function App() {
   // --- Initialization ---
   const initialSegments: Segment[] = [
-    // Removed "Create an " text to allow Label to be first visually (normalizeSegments will add an empty text segment)
     { id: uuidv4(), type: 'label', content: 'Composition', color: LABEL_COLORS[0], icon: 'Layers' }, 
     { id: uuidv4(), type: 'text', content: 'editorial fashion photography, wide shot, three models standing in a ' },
     { id: uuidv4(), type: 'random', content: ['minimalist concrete hall', 'neon-lit subway', 'industrial warehouse'], activeValue: 'minimalist concrete hall' },
@@ -441,14 +164,6 @@ export default function App() {
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
-  // --- Sorting ---
-  const sortedOptionPresets = useMemo(() => {
-    return [...optionPresets].sort((a, b) => a.name.localeCompare(b.name));
-  }, [optionPresets]);
-
-  const sortedSectionPresets = useMemo(() => {
-    return [...sectionPresets].sort((a, b) => a.name.localeCompare(b.name));
-  }, [sectionPresets]);
 
   // --- Actions ---
 
@@ -502,23 +217,17 @@ export default function App() {
             if (val) {
                 text = val;
                 // Auto-Comma Logic:
-                // If the block produces a value, check the NEXT content segment.
-                // If it's NOT punctuation, add a comma.
                 const next = contentSegments[idx + 1];
                 let addComma = true;
                 
                 if (!next) {
-                    // End of prompt. Don't add comma.
                     addComma = false;
                 } else if (next.type === 'text') {
                     const nextContent = next.content as string;
-                    // Check if next text starts with punctuation (ignoring whitespace)
-                    // Matches: . , ; ? !
                     if (/^\s*[.,;?!]/.test(nextContent)) {
                         addComma = false;
                     }
                 }
-                // If next is another block (type 'random'), addComma remains true.
                 
                 if (addComma) {
                     text += ', '; 
@@ -649,7 +358,6 @@ export default function App() {
 
   const handleTextChange = (id: string, newText: string) => {
     // We do NOT normalize on every keystroke to avoid cursor jumping and performance issues.
-    // Normalization only happens on structural changes (split, delete, paste)
     setSegments(prev => prev.map(s => s.id === id ? { ...s, content: newText } : s));
   };
 
@@ -659,14 +367,12 @@ export default function App() {
     const seg = segments[segIdx];
     const content = seg.content as string;
     
-    // Explicitly handle split logic.
-    // If we are at index, we want: [0..index] + '\n' AND [index..end]
     const pre = content.substring(0, index) + '\n';
     const post = content.substring(index); 
 
     const newSegs: Segment[] = [
         { ...seg, content: pre },
-        { id: uuidv4(), type: 'text', content: post } // Ensure new segment is created even if 'post' is empty
+        { id: uuidv4(), type: 'text', content: post } 
     ];
     
     const result = [...segments];
@@ -676,16 +382,10 @@ export default function App() {
     saveSnapshot(normalized);
     setSegments(normalized);
     
-    // Find the new segment to focus
     const newId = newSegs[1].id;
-    // Check if newId exists (split successful) or was merged back (e.g. text split inside text)
     if (normalized.find(s => s.id === newId)) {
         setFocusRequest({ id: newId, offset: 0 });
     } else {
-        // Segment was merged back into the original ID or previous ID.
-        // We know we split at 'pre.length'. Since 'pre' ends with \n, the cursor should be at index `pre.length`.
-        // However, if the user pressed Enter, they usually expect to be on the new line (the next segment).
-        // If normalization merged it (unlikely with \n split logic), we check:
         const mergedSeg = normalized.find(s => s.id === seg.id);
         if (mergedSeg) {
             setFocusRequest({ id: seg.id, offset: pre.length });
@@ -715,13 +415,11 @@ export default function App() {
         }
         
         const newContent = finalPrevContent + currContent;
-        // Modify copy
         newSegments[index - 1] = { ...previous, content: newContent };
         newSegments.splice(index, 1);
         focusTarget = { id: previous.id, offset: mergeOffset };
 
     } else if (previous.type !== 'text') {
-        // Delete block
         newSegments.splice(index - 1, 1); 
         focusTarget = { id: current.id, offset: 0 };
     } 
@@ -746,7 +444,6 @@ export default function App() {
 
   const addLabel = () => {
     const color = LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)];
-    // New labels now start empty and with a default 'Tag' icon
     const newLabel: Segment = { id: uuidv4(), type: 'label', content: '', color: color, icon: 'Tag' };
     let newSegments = [...segments];
     
@@ -800,7 +497,6 @@ export default function App() {
       result.splice(index, 1, ...newSegmentsSlice);
       
       const normalized = normalizeSegments(result);
-      // Auto-select the newly created block
       setTimeout(() => setSelectedOptionId(newRandomId), 0);
       return normalized;
     });
@@ -814,11 +510,9 @@ export default function App() {
     const seg = segments[index];
     const text = seg.activeValue || '';
     
-    // Replace Option segment with Text segment containing current value
     const newSegments = [...segments];
     newSegments[index] = { id: uuidv4(), type: 'text', content: text };
     
-    // Normalization will merge with adjacent text segments
     updateSegments(newSegments);
     setEditingSegmentId(null);
     setSelectedOptionId(null);
@@ -827,23 +521,19 @@ export default function App() {
 
   const updateRandomOptions = (newOptions: string[], newDisabledIndices: number[]) => {
     if (editingSegmentId) {
-        // Editing a block on the canvas
         const newSegments = segments.map(s => {
           if (s.id === editingSegmentId) {
             let newActive = s.activeValue;
             
-            // Check if active value is now disabled or removed
             const activeIndex = newOptions.indexOf(newActive || '');
             const isActiveDisabled = activeIndex !== -1 && newDisabledIndices.includes(activeIndex);
             const isRemoved = activeIndex === -1;
 
             if (isRemoved || isActiveDisabled) {
-                // Find first enabled option
                 const firstEnabledIndex = newOptions.findIndex((_, idx) => !newDisabledIndices.includes(idx));
                 if (firstEnabledIndex !== -1) {
                     newActive = newOptions[firstEnabledIndex];
                 } else {
-                    // All disabled? Keep first one but it will be rendered dim
                     newActive = newOptions.length > 0 ? newOptions[0] : '';
                 }
             }
@@ -854,10 +544,6 @@ export default function App() {
         });
         updateSegments(newSegments);
     } else if (editingPresetId) {
-        // Editing a preset in the folder
-        // Note: For presets, we currently just store the list of strings.
-        // If we want to store enabled state in presets, OptionPreset interface needs update.
-        // For now, we'll just save the text options and ignore disabled state for library presets to keep them simple.
         setOptionPresets(prev => prev.map(p => {
             if (p.id === editingPresetId) {
                 return { ...p, options: newOptions };
@@ -912,7 +598,6 @@ export default function App() {
       
       let newSegments = [...segments];
 
-      // 1. If an Option block is selected, insert after it
       if (selectedOptionId) {
           const index = newSegments.findIndex(s => s.id === selectedOptionId);
           if (index !== -1) {
@@ -923,7 +608,6 @@ export default function App() {
           }
       }
 
-      // 2. If text cursor is active (selection.startId is set), insert at cursor
       if (selection.startId) {
           const index = newSegments.findIndex(s => s.id === selection.startId);
           if (index !== -1) {
@@ -932,7 +616,6 @@ export default function App() {
                   const content = seg.content as string;
                   const offset = selection.startOffset;
                   
-                  // Split text segment
                   const pre = content.substring(0, offset);
                   const post = content.substring(offset);
                   
@@ -941,7 +624,6 @@ export default function App() {
                   
                   newSegments.splice(index, 1, preSeg, newSeg, postSeg);
               } else {
-                  // Fallback: insert after segment if not text
                   newSegments.splice(index + 1, 0, newSeg);
               }
               updateSegments(newSegments);
@@ -950,7 +632,6 @@ export default function App() {
           }
       }
 
-      // 3. Fallback: Append to end
       newSegments.push(newSeg);
       updateSegments(newSegments);
       showNotification(`Inserted "${preset.name}"`);
@@ -966,7 +647,7 @@ export default function App() {
           ...segments[index],
           content: [...preset.options],
           activeValue: activeVal,
-          disabledIndices: [] // Reset disabled state on replacement
+          disabledIndices: [] 
       };
       
       const newSegments = [...segments];
@@ -988,24 +669,21 @@ export default function App() {
       if (!group || !group.labelSegment) return;
       
       setPresetNameInput(group.labelSegment.content as string);
-      setSavingSectionId(activeLabelMenuId); // Preserve the target ID
-      setActiveLabelMenuId(null); // Close the Label Menu immediately
+      setSavingSectionId(activeLabelMenuId); 
+      setActiveLabelMenuId(null); 
       setIsSaveSectionModalOpen(true);
   };
 
   const confirmSaveSection = () => {
-      if (!savingSectionId || !presetNameInput.trim()) return; // Use preserved ID
+      if (!savingSectionId || !presetNameInput.trim()) return; 
       
       const name = presetNameInput.trim();
       const existing = sectionPresets.find(p => p.name === name);
 
       if (existing) {
-          // Trigger Overwrite Modal, hide Input Modal
-          // Do NOT clear savingSectionId yet, we need it for the overwrite
           setIsSaveSectionModalOpen(false); 
           setOverwriteTarget({ id: existing.id, name: existing.name });
       } else {
-          // Create New
           const group = groupSegments(segments).find(g => g.labelSegment?.id === savingSectionId);
           if (!group || !group.labelSegment) return;
 
@@ -1044,7 +722,6 @@ export default function App() {
   };
 
   const handleInsertSectionPreset = (preset: SectionPreset) => {
-      // Regenerate IDs for all segments in the preset
       const pastedSegments = preset.data.map(s => ({ ...s, id: uuidv4() }));
 
       if (selection.startId) {
@@ -1057,7 +734,6 @@ export default function App() {
                   let pre = content.substring(0, offset);
                   const post = content.substring(offset);
 
-                  // Ensure Label starts on new line
                   if (pre.length > 0 && !pre.endsWith('\n')) {
                       pre += '\n';
                   }
@@ -1080,7 +756,6 @@ export default function App() {
           }
       }
 
-      // Fallback: Append
       updateSegments([...segments, ...pastedSegments]);
       showNotification(`Inserted Section "${preset.name}"`);
   };
@@ -1097,14 +772,12 @@ export default function App() {
     setTimeout(() => {
       const next = segments.map(seg => {
         if (seg.type === 'random' && Array.isArray(seg.content) && seg.content.length > 0) {
-          // Filter out disabled options
           const disabled = seg.disabledIndices || [];
           const enabledOptions = seg.content.filter((_, i) => !disabled.includes(i));
           
           if (enabledOptions.length > 0) {
               return { ...seg, activeValue: getRandom(enabledOptions) };
           }
-          // If all disabled, keep current or first (it will be rendered dim)
           return seg;
         }
         return seg;
@@ -1128,13 +801,9 @@ export default function App() {
   const handleContainerClick = (e: React.MouseEvent) => {
     if (!editorContainerRef.current) return;
     
-    // Ignore clicks on buttons/blocks/contentEditable=false areas
-    // Note: Option blocks now handle their own clicks via stopPropagation to set selection
     if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('[contenteditable="false"]')) return;
 
-    // FIX: If the user has selected text (Range), do not force-move the cursor.
-    // This happens when a user drags to select text and releases mouse (triggering click).
     const currentSel = window.getSelection();
     if (currentSel && !currentSel.isCollapsed && currentSel.toString().length > 0) {
         return;
@@ -1143,7 +812,6 @@ export default function App() {
     const clickY = e.clientY;
     const spans = Array.from(editorContainerRef.current.querySelectorAll('span[data-segment-id]'));
     
-    // Helper to get candidates with a specific vertical tolerance
     const getCandidates = (tolerance: number) => {
         const found: { rect: DOMRect, span: HTMLElement }[] = [];
         spans.forEach(span => {
@@ -1158,29 +826,19 @@ export default function App() {
         return found;
     };
 
-    // 1. Identify all segments/lines that vertically intersect the click
-    // First, try strict matching (no tolerance) to avoid ambiguity with stacked empty lines
     let candidates = getCandidates(0);
-    // Fallback to loose matching if no strict match found
     if (candidates.length === 0) {
         candidates = getCandidates(6);
     }
 
     if (candidates.length > 0) {
-        // Found matching visual line(s).
-        // Find the one furthest to the right (visually last on this line).
         candidates.sort((a, b) => b.rect.right - a.rect.right);
         const rightMost = candidates[0];
 
-        // 2. Determine target selection
-        // If the user clicked in the empty space to the right of a line
         if (e.clientX > rightMost.rect.right) {
              const span = rightMost.span;
              const text = span.textContent || '';
              
-             // Fix: If spans ends with newline, we want to place cursor BEFORE the newline (index - 1)
-             // This ensures the cursor visually stays on the line the user clicked, rather than
-             // wrapping to the start of the next line (which is what the browser defaults to for index after \n).
              let offset = text.length;
              if (text.endsWith('\n') && offset > 0) {
                  offset -= 1;
@@ -1200,16 +858,13 @@ export default function App() {
              return;
         }
 
-        // 3. Use standard API to resolve caret position for clicks WITHIN the line text
         if ((document as any).caretRangeFromPoint) {
             const range = (document as any).caretRangeFromPoint(e.clientX, clickY);
             if (range) {
-                // FALLBACK: If caretRangeFromPoint hit the CONTAINER (bg) instead of a text node
                 const container = editorContainerRef.current;
                 if (range.startContainer === container || container.contains(range.startContainer) && range.startContainer.nodeName === 'DIV') {
                      const span = rightMost.span;
                      span.focus();
-                     // Place cursor at end of span (applying same newline fix logic)
                      const text = span.textContent || '';
                      let offset = text.length;
                      if (text.endsWith('\n') && offset > 0) offset -= 1;
@@ -1224,14 +879,10 @@ export default function App() {
                      return;
                 }
 
-                // 4. Line Jump Correction
-                // If the browser resolved the caret to the start of the NEXT line (common for wrapping/newlines),
-                // but the user clicked the CURRENT line...
                 const rangeRects = range.getClientRects();
                 if (rangeRects.length > 0) {
                     const caretRect = rangeRects[0];
                     if (caretRect.top > rightMost.rect.bottom - 2) {
-                         // Back up one character if possible, specifically if we are at the char after \n
                          if (range.startContainer.nodeType === Node.TEXT_NODE) {
                              const content = range.startContainer.textContent || '';
                              if (range.startOffset > 0 && content[range.startOffset - 1] === '\n') {
@@ -1242,7 +893,6 @@ export default function App() {
                     }
                 }
 
-                // Check specifically if we landed exactly AFTER a newline character
                 if (range.startContainer.nodeType === Node.TEXT_NODE) {
                     const content = range.startContainer.textContent || '';
                     if (range.startOffset === content.length && content.endsWith('\n')) {
@@ -1255,7 +905,6 @@ export default function App() {
                 sel?.removeAllRanges();
                 sel?.addRange(range);
                 
-                // Ensure the span is focused (EditableSpan needs focus to work)
                 const containerSpan = range.startContainer.parentElement?.closest('span[data-segment-id]') as HTMLElement;
                 containerSpan?.focus();
                 return;
@@ -1266,21 +915,17 @@ export default function App() {
 
   const handleNativeCopy = () => {};
   
-  // Unified paste handler
   const handlePasteData = async (text: string) => {
       if (!text) return;
 
       let pastedSegments: Segment[] | null = null;
       
-      // Try parsing as Prismaflow fragment
       try {
           const parsed = JSON.parse(text);
           if (parsed && parsed.type === ALCHEMIST_MIME_TYPE && Array.isArray(parsed.data)) {
-              // Regenerate IDs
               pastedSegments = parsed.data.map((s: Segment) => ({ ...s, id: uuidv4() }));
           }
       } catch (e) {
-          // Not JSON, ignore
       }
 
       if (selection.startId) {
@@ -1289,15 +934,11 @@ export default function App() {
               const seg = segments[index];
               
               if (seg.type === 'text') {
-                   // Split and insert
                    const content = seg.content as string;
                    const offset = selection.startOffset;
                    let pre = content.substring(0, offset);
                    const post = content.substring(offset);
 
-                   // NEW LOGIC: If we are pasting a Section (starting with a Label), 
-                   // ensure it starts on a new line to preserve structural alignment.
-                   // If 'pre' is not empty and doesn't end with a newline, append one.
                    if (pastedSegments && pastedSegments.length > 0 && pastedSegments[0].type === 'label') {
                        if (pre.length > 0 && !pre.endsWith('\n')) {
                            pre += '\n';
@@ -1310,51 +951,36 @@ export default function App() {
                        const postSeg = { id: uuidv4(), type: 'text' as SegmentType, content: post };
                        newSegments.splice(index, 1, preSeg, ...pastedSegments, postSeg);
                    } else {
-                       // Plain text paste logic: Split by lines to ensure empty lines create separate segments
                        const lines = text.split(/\r\n|\r|\n/);
-                       
-                       // If we only have one line (and no internal newlines), proceed simply
                        if (lines.length === 1) {
                             const newContent = pre + text + post;
                             newSegments[index] = {...seg, content: newContent};
                        } else {
-                            // Multi-line paste: create separate segments for structure
                             const segmentsToInsert: Segment[] = [];
                             lines.forEach((line, i) => {
                                 const isLastLine = i === lines.length - 1;
                                 let lineContent = line;
-                                
-                                // All lines except the last must end with \n to maintain flow
                                 if (!isLastLine) {
                                     lineContent += '\n';
                                 }
-                                
-                                // First line merges with 'pre' part of existing segment
                                 if (i === 0) {
                                     lineContent = pre + lineContent;
                                 }
-                                
-                                // Last line merges with 'post' part of existing segment
                                 if (isLastLine) {
                                     lineContent = lineContent + post;
                                 }
-                                
                                 segmentsToInsert.push({ id: uuidv4(), type: 'text', content: lineContent });
                             });
-                            
-                            // Replace the original segment with these new structured segments
                             newSegments.splice(index, 1, ...segmentsToInsert);
                        }
                    }
                    updateSegments(newSegments);
                    return;
               } else {
-                  // Insert after block
                   let newSegments = [...segments];
                   if (pastedSegments) {
                       newSegments.splice(index + 1, 0, ...pastedSegments);
                   } else {
-                      // If inserting plain text after a block, also handle multiline split if needed
                        const lines = text.split(/\r\n|\r|\n/);
                        const segmentsToInsert = lines.map((line, i) => {
                            const isLastLine = i === lines.length - 1;
@@ -1372,11 +998,9 @@ export default function App() {
           }
       }
       
-      // No selection fallback
       if (pastedSegments) {
           updateSegments([...segments, ...pastedSegments]);
       } else {
-          // Append plain text
           updateSegments([...segments, { id: uuidv4(), type: 'text', content: text }]);
       }
   };
@@ -1640,7 +1264,7 @@ export default function App() {
           if (selectedSidebarProjectId === id) setSelectedSidebarProjectId(null);
       } else if (type === 'option') {
           setOptionPresets(prev => prev.filter(p => p.id !== id));
-          if (selectedLibraryOptionId === id) setSelectedLibraryOptionId(null); // Clear selection on delete
+          if (selectedLibraryOptionId === id) setSelectedLibraryOptionId(null); 
       } else if (type === 'section') {
           setSectionPresets(prev => prev.filter(p => p.id !== id));
       }
@@ -1654,14 +1278,14 @@ export default function App() {
       <input type="file" ref={fileInputRef} onChange={handleImportCSV} className="hidden" />
       <input type="file" ref={backupFileInputRef} onChange={handleImportBackup} accept=".json" className="hidden" />
       
-      {/* Notifications - FIXED: Strictly conditional rendering to prevent ghost icon */}
+      {/* Notifications */}
       {notification && notification.trim() !== '' && (
       <div className={`fixed top-6 left-1/2 -translate-x-1/2 bg-canvas-800 border border-brand-500/50 text-brand-100 px-6 py-3 rounded-full shadow-lg z-50 transition-all opacity-100 translate-y-0`}>
           <Zap size={14} className="inline mr-2" />{notification}
       </div>
       )}
 
-      {/* Help Button - Conditional render inside Modal check, but Button is always visible */}
+      {/* Help Button */}
       <button 
         onClick={(e) => { e.stopPropagation(); setIsHelpModalOpen(true); }}
         className="fixed z-50 p-2 text-canvas-500 hover:text-brand-400 transition-colors bg-canvas-900/50 rounded-full border border-canvas-800 hover:border-brand-500/50 right-4 bottom-6 lg:bottom-auto lg:top-6 lg:right-6"
@@ -1677,35 +1301,27 @@ export default function App() {
         <p className="text-canvas-500 font-mono text-xs tracking-[0.2em] uppercase">Modular Prompt Engine</p>
       </header>
 
-      {/* Mobile Layout Fix: Allow h-auto on mobile, fixed height on desktop */}
+      {/* Main Content Area */}
       <main className="w-full max-w-7xl flex flex-col lg:flex-row gap-6 items-start h-auto lg:h-[calc(100vh-200px)]">
         {/* Left Column (Toolbar + Editor) */}
         <div className="flex-1 w-full min-w-0 flex flex-col h-auto lg:h-full gap-4">
-            {/* Toolbar - FIXED: Consistent px-3 py-2 padding, smaller text */}
-            <div className="bg-canvas-900 border border-canvas-800 rounded-lg px-3 py-2 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0" onClick={e => e.stopPropagation()}>
-                <div className="flex-1 w-full md:w-auto flex gap-2 items-center">
-                    <input type="text" value={promptName} onChange={e => setPromptName(e.target.value)} className="bg-transparent text-sm font-bold text-white w-full focus:outline-none" placeholder="Untitled Project" />
-                    {currentProjectId && <span className={`text-[10px] px-2 py-0.5 rounded-full border ${!isDirty ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-400'}`}>{!isDirty ? 'Synced' : 'Edited'}</span>}
-                </div>
-                <div className="flex items-center gap-1">
-                    <button onClick={handleUndo} className="p-1.5 text-canvas-400 hover:text-white rounded" title="Undo"><Undo2 size={16}/></button>
-                    <div className="w-px h-4 bg-canvas-800 mx-2"></div>
-                    <button onClick={addLabel} className="p-1.5 text-canvas-400 hover:text-brand-400 rounded" title="Add Label"><Tag size={16}/></button>
-                    <button onClick={convertToRandom} className={`p-1.5 rounded ${canRandomize ? 'text-brand-400' : 'text-canvas-600'}`} title="Randomize"><Zap size={16}/></button>
-                    <div className="w-px h-4 bg-canvas-800 mx-2"></div>
-                    <button onClick={handleToolbarPaste} className="p-1.5 text-canvas-400 hover:text-white rounded" title="Paste"><ClipboardPaste size={16}/></button>
-                    <div className="w-px h-4 bg-canvas-800 mx-2"></div>
-                    <button onClick={handleSaveProject} className="p-1.5 text-canvas-400 hover:text-white rounded" title="Save"><Save size={16}/></button>
-                    <button onClick={handleSaveAsNew} className="p-1.5 text-canvas-400 hover:text-emerald-400 rounded" title="Save Copy"><FilePlus size={16}/></button>
-                    
-                    {/* Backup Controls */}
-                    <button onClick={handleExportBackup} className="p-1.5 text-canvas-400 hover:text-sky-400 rounded" title="Export Backup"><Upload size={16}/></button>
-                    <button onClick={handleImportClick} className="p-1.5 text-canvas-400 hover:text-purple-400 rounded" title="Import Backup"><Download size={16}/></button>
-                    
-                    <div className="w-px h-4 bg-canvas-800 mx-2"></div>
-                    <button onClick={handleClear} className="p-1.5 text-canvas-400 hover:text-red-400 rounded" title="Clear"><Trash2 size={16}/></button>
-                </div>
-            </div>
+            
+            <Toolbar 
+              promptName={promptName}
+              setPromptName={setPromptName}
+              currentProjectId={currentProjectId}
+              isDirty={isDirty}
+              canRandomize={canRandomize}
+              onUndo={handleUndo}
+              onAddLabel={addLabel}
+              onRandomize={convertToRandom}
+              onPaste={handleToolbarPaste}
+              onSave={handleSaveProject}
+              onSaveAsNew={handleSaveAsNew}
+              onExportBackup={handleExportBackup}
+              onImportBackup={handleImportClick}
+              onClear={handleClear}
+            />
 
             <div 
                 ref={editorContainerRef}
@@ -1798,7 +1414,6 @@ export default function App() {
                             </span>
                             
                             {/* Actions - Floating Bubble (Absolute Positioning) */}
-                            {/* FIX: Hit area bridge. Container padded bottom to reach the parent block */}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full pb-1.5 z-50 hidden group-hover/opt:flex justify-center animate-in fade-in zoom-in-95 duration-100 pointer-events-none group-hover/opt:pointer-events-auto">
                                 <span className="bg-canvas-900 border border-canvas-700 rounded shadow-xl flex items-center gap-1 px-2 py-1 min-w-[80px] justify-center pointer-events-auto">
                                     <button 
@@ -1829,223 +1444,44 @@ export default function App() {
                     }
                 })}
             </div>
+            
+            <PromptOutput 
+              promptText={resultPrompt}
+              isRerolling={isRerolling}
+              copied={copied}
+              onReroll={handleReroll}
+              onCopy={handleCopy}
+            />
 
-            <div className="bg-canvas-950 border border-canvas-800 rounded-lg flex flex-col shrink-0 min-h-[140px]" onClick={e => e.stopPropagation()}>
-                {/* Generated Prompt Header - FIXED: Consistent px-3 py-2 padding */}
-                <div className="bg-canvas-900/50 px-3 py-2 border-b border-canvas-800 flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-xs text-canvas-500 font-bold uppercase tracking-widest"><Terminal size={14}/> Generated Prompt</div>
-                    <div className="flex items-center gap-2">
-                         <button onClick={handleReroll} className={`p-1.5 rounded bg-brand-600 hover:bg-brand-500 text-white shadow-lg ${isRerolling ? 'animate-spin':''}`}><RefreshCw size={16}/></button>
-                         <button onClick={handleCopy} className="p-1.5 rounded bg-canvas-800 hover:bg-canvas-700 text-canvas-400 hover:text-white">{copied ? <Check size={16}/> : <Copy size={16}/>}</button>
-                    </div>
-                </div>
-                <div className="p-4 overflow-y-auto custom-scrollbar max-h-[100px] flex-1">
-                     <p className={`font-mono text-sm text-canvas-300 leading-relaxed ${isRerolling?'opacity-50 blur-[1px]':'opacity-100'}`}>{resultPrompt}</p>
-                </div>
-            </div>
         </div>
 
-        {/* Tabbed Sidebar - Mobile: h-auto allows it to flow naturally. Desktop: Fixed width & full height. */}
-        <div 
-            className="w-full lg:w-72 flex-shrink-0 h-auto lg:h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()} // Stop propagation here to prevent sidebar interaction from deselecting items
-        >
-             
-             {/* Tab Header - FIXED: Consistent py-2 padding */}
-             <div className="flex shrink-0 border-b border-canvas-800">
-                <button 
-                    onClick={() => setActiveSidebarTab('library')}
-                    className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeSidebarTab === 'library' ? 'bg-canvas-800 text-brand-400 border-b-2 border-brand-500' : 'bg-canvas-900 text-canvas-500 hover:text-canvas-300 hover:bg-canvas-800/50'}`}
-                >
-                    <Library size={14}/> Library
-                </button>
-                <button 
-                    onClick={() => setActiveSidebarTab('projects')}
-                    className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeSidebarTab === 'projects' ? 'bg-canvas-800 text-brand-400 border-b-2 border-brand-500' : 'bg-canvas-900 text-canvas-500 hover:text-canvas-300 hover:bg-canvas-800/50'}`}
-                >
-                    <Book size={14}/> Projects
-                </button>
-             </div>
-
-             {/* Tab Content: Library */}
-             {activeSidebarTab === 'library' && (
-                 <div className="flex flex-col lg:flex-1 lg:overflow-hidden">
-                     {/* 1. Option Presets */}
-                     <div className="flex flex-col lg:flex-1 lg:min-h-0 border-b border-canvas-800">
-                         {/* Library Headers - Refactored for Centralized Toolbar */}
-                         <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between border-b border-canvas-800">
-                            <div className="flex items-center gap-2">
-                                <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><Folder size={12}/> Options</h4>
-                            </div>
-                            <div className="flex items-center gap-0.5">
-                                {/* Save New (From Canvas) */}
-                                <button 
-                                    onClick={handleOpenSavePresetModal}
-                                    disabled={!selectedOptionId}
-                                    className="p-1.5 rounded hover:bg-brand-600/20 text-brand-400 hover:text-brand-300 disabled:opacity-20 transition-colors"
-                                    title="Save selected Block to Library"
-                                >
-                                    <FolderPlus size={14}/>
-                                </button>
-                                
-                                <div className="w-px h-3 bg-canvas-800 mx-1"></div>
-
-                                {/* Actions for Selected Preset */}
-                                <button 
-                                    onClick={() => { const p = sortedOptionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleInsertPreset(p); }}
-                                    disabled={!selectedLibraryOptionId}
-                                    className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
-                                    title="Insert Selected"
-                                >
-                                    <ClipboardPaste size={14}/>
-                                </button>
-                                <button 
-                                    onClick={() => { const p = sortedOptionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleReplacePreset(p); }}
-                                    disabled={!selectedLibraryOptionId || !selectedOptionId}
-                                    className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
-                                    title="Swap with Selected Block"
-                                >
-                                    <ArrowRightLeft size={14}/>
-                                </button>
-                                <button 
-                                    onClick={() => setEditingPresetId(selectedLibraryOptionId)}
-                                    disabled={!selectedLibraryOptionId}
-                                    className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
-                                    title="Edit Preset"
-                                >
-                                    <Edit3 size={14}/>
-                                </button>
-                                <button 
-                                    onClick={() => selectedLibraryOptionId && handleDeletePreset(selectedLibraryOptionId)}
-                                    disabled={!selectedLibraryOptionId}
-                                    className="p-1.5 rounded hover:bg-red-900/30 text-canvas-400 hover:text-red-400 disabled:opacity-20 transition-colors"
-                                    title="Delete Preset"
-                                >
-                                    <Trash2 size={14}/>
-                                </button>
-                            </div>
-                         </div>
-
-                         {/* Options List - Refactored for Selection */}
-                         <div 
-                             className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar"
-                             onClick={() => setSelectedLibraryOptionId(null)} // Click empty space to deselect
-                         >
-                             {sortedOptionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No options saved</div>}
-                             {sortedOptionPresets.map(preset => (
-                                <div 
-                                    key={preset.id} 
-                                    onClick={(e) => { e.stopPropagation(); setSelectedLibraryOptionId(preset.id === selectedLibraryOptionId ? null : preset.id); }}
-                                    className={`group border cursor-pointer rounded-md px-3 py-2 transition-all flex items-center justify-between
-                                        ${selectedLibraryOptionId === preset.id 
-                                            ? 'bg-brand-900/20 border-brand-500/50' 
-                                            : 'border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800'
-                                        }`}
-                                >
-                                    <span className="text-xs font-bold truncate text-canvas-300 group-hover:text-white">
-                                        {preset.name}
-                                    </span>
-                                    {selectedLibraryOptionId === preset.id && <div className="w-1.5 h-1.5 rounded-full bg-brand-500"></div>}
-                                </div>
-                             ))}
-                         </div>
-                     </div>
-
-                     {/* 2. Section Presets */}
-                     <div className="flex flex-col lg:flex-1 lg:min-h-0">
-                         {/* Library Headers - FIXED: Consistent px-3 py-2 padding */}
-                         <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between border-t border-canvas-800">
-                            <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><LayoutTemplate size={12}/> Sections</h4>
-                            {/* Save handled via Label Menu */}
-                         </div>
-                         <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
-                             {sortedSectionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No sections saved</div>}
-                             {sortedSectionPresets.map(preset => (
-                                <div key={preset.id} className="group border border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800 rounded-md p-2 transition-all flex items-center justify-between">
-                                    <div className="overflow-hidden">
-                                        <span className="text-xs font-bold text-canvas-300 group-hover:text-white truncate block">{preset.name}</span>
-                                        <span className="text-[10px] text-canvas-500">{preset.data.length} segments</span>
-                                    </div>
-                                    <div className="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleInsertSectionPreset(preset)} className="p-1.5 bg-canvas-700 hover:bg-brand-600 text-canvas-300 hover:text-white rounded" title="Insert Section"><ClipboardPaste size={12}/></button>
-                                        <button onClick={() => handleDeleteSectionPreset(preset.id)} className="p-1.5 bg-canvas-700 hover:bg-red-500 text-canvas-300 hover:text-white rounded" title="Delete Section"><Trash2 size={12}/></button>
-                                    </div>
-                                </div>
-                             ))}
-                         </div>
-                     </div>
-                 </div>
-             )}
-
-             {/* Tab Content: Projects */}
-             {activeSidebarTab === 'projects' && (
-                 <div className="flex flex-col lg:flex-1 lg:overflow-hidden relative">
-                     {/* Projects Header - Centralized Toolbar */}
-                     <div className="px-3 py-2 flex items-center justify-end border-b border-canvas-800 shrink-0 relative z-20 overflow-hidden">
-                        
-                        <div className="flex items-center gap-0.5 relative z-10">
-                            {/* Load */}
-                            <button 
-                                onClick={() => { const p = savedProjects.find(x => x.id === selectedSidebarProjectId); if(p) handleLoadProject(p); }}
-                                disabled={!selectedSidebarProjectId}
-                                className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
-                                title="Open Project"
-                            >
-                                <FolderOpen size={14}/>
-                            </button>
-                            
-                            {/* Duplicate */}
-                            <button 
-                                onClick={handleDuplicateSavedProject}
-                                disabled={!selectedSidebarProjectId}
-                                className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
-                                title="Duplicate Project"
-                            >
-                                <Copy size={14}/>
-                            </button>
-                            
-                            {/* Delete */}
-                            <button 
-                                onClick={() => selectedSidebarProjectId && handleDeleteProject(selectedSidebarProjectId)}
-                                disabled={!selectedSidebarProjectId}
-                                className="p-1.5 rounded hover:bg-red-900/30 text-canvas-400 hover:text-red-400 disabled:opacity-20 transition-colors"
-                                title="Delete Project"
-                            >
-                                <Trash2 size={14}/>
-                            </button>
-                        </div>
-                     </div>
-                     
-                     <div 
-                         className={`p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 flex flex-col ${savedProjects.length > 0 ? 'pb-32' : ''}`}
-                         onClick={() => setSelectedSidebarProjectId(null)} // Click empty space to deselect
-                     >
-                         {savedProjects.length === 0 && <div className="flex-1 flex flex-col items-center justify-center min-h-[200px] text-canvas-600 space-y-3 text-center p-4"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
-                         {savedProjects.map(p => (
-                            <div 
-                                key={p.id} 
-                                onClick={(e) => { e.stopPropagation(); setSelectedSidebarProjectId(p.id === selectedSidebarProjectId ? null : p.id); }}
-                                className={`group border rounded-md p-3 cursor-pointer transition-all relative z-20 backdrop-blur-sm shrink-0
-                                    ${selectedSidebarProjectId === p.id
-                                        ? 'bg-brand-900/40 border-brand-500/50'
-                                        : 'bg-canvas-900/40 border-canvas-800/50 hover:bg-canvas-800 hover:border-canvas-700'
-                                    }
-                                `}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <h4 className={`text-sm font-medium truncate pr-2 ${currentProjectId === p.id ? 'text-emerald-400' : selectedSidebarProjectId === p.id ? 'text-brand-200' : 'text-canvas-300 group-hover:text-white'}`}>{p.name}</h4>
-                                    {currentProjectId === p.id && <span className="text-[9px] uppercase tracking-widest text-emerald-500 font-bold border border-emerald-500/30 px-1.5 rounded">Active</span>}
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[10px] text-canvas-500 mt-1.5 font-mono"><Clock size={10}/>{new Date(p.updatedAt).toLocaleDateString()}</div>
-                            </div>
-                         ))}
-                     </div>
-                 </div>
-             )}
-        </div>
+        {/* Tabbed Sidebar */}
+        <Sidebar 
+          activeTab={activeSidebarTab}
+          setActiveTab={setActiveSidebarTab}
+          optionPresets={optionPresets}
+          sectionPresets={sectionPresets}
+          savedProjects={savedProjects}
+          selectedLibraryOptionId={selectedLibraryOptionId}
+          setSelectedLibraryOptionId={setSelectedLibraryOptionId}
+          selectedSidebarProjectId={selectedSidebarProjectId}
+          setSelectedSidebarProjectId={setSelectedSidebarProjectId}
+          currentProjectId={currentProjectId}
+          canSaveOption={!!selectedOptionId}
+          onOpenSavePresetModal={handleOpenSavePresetModal}
+          onInsertPreset={handleInsertPreset}
+          onReplacePreset={handleReplacePreset}
+          onEditPreset={setEditingPresetId}
+          onDeletePreset={handleDeletePreset}
+          onInsertSection={handleInsertSectionPreset}
+          onDeleteSection={handleDeleteSectionPreset}
+          onLoadProject={handleLoadProject}
+          onDuplicateProject={handleDuplicateSavedProject}
+          onDeleteProject={handleDeleteProject}
+        />
       </main>
 
-      <footer className="mt-8 text-canvas-600 text-[10px] font-mono uppercase tracking-widest">Prismaflow Engine v1.1</footer>
+      <footer className="mt-8 text-canvas-600 text-[10px] font-mono uppercase tracking-widest">Prismaflow Engine v1.2</footer>
 
       {/* Editor Modal (Used for both Canvas Blocks and Library Presets) */}
       {isEditorOpen && (
