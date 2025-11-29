@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
@@ -10,7 +11,8 @@ import {
   Tag,
   Check,
   Copy,
-  FolderPlus
+  FolderPlus,
+  LABEL_ICONS
 } from './Icons';
 
 interface LabelMenuProps {
@@ -19,9 +21,11 @@ interface LabelMenuProps {
   anchorRef: React.RefObject<HTMLElement>;
   labelName: string;
   currentColor: string;
+  currentIcon: string;
   colors: string[];
   onRename: (newName: string) => void;
   onColorChange: (color: string) => void;
+  onIconChange: (iconKey: string) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onCopySection: () => void;
@@ -38,9 +42,11 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   anchorRef,
   labelName,
   currentColor,
+  currentIcon,
   colors,
   onRename,
   onColorChange,
+  onIconChange,
   onMoveUp,
   onMoveDown,
   onCopySection,
@@ -65,11 +71,20 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   useLayoutEffect(() => {
     if (isOpen && anchorRef.current) {
         const rect = anchorRef.current.getBoundingClientRect();
-        const MENU_WIDTH = 256;
+        const MENU_WIDTH = 320; // Increased width (w-80)
         let top = rect.top;
         let left = rect.right + 8;
+        
+        // Horizontal flip if not enough space
         if (left + MENU_WIDTH > window.innerWidth) left = rect.left - MENU_WIDTH - 8;
-        if (top + 400 > window.innerHeight) top = Math.max(10, window.innerHeight - 410);
+        
+        // Vertical positioning (Smart clamping)
+        // We assume the menu is roughly 400px high max now that we removed scroll
+        const MENU_EST_HEIGHT = 420;
+        if (top + MENU_EST_HEIGHT > window.innerHeight) {
+            top = Math.max(10, window.innerHeight - MENU_EST_HEIGHT - 20);
+        }
+        
         setPosition({ top, left });
     }
   }, [isOpen, anchorRef]);
@@ -99,8 +114,8 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
 
   const handleSaveRename = (e?: React.MouseEvent | React.KeyboardEvent) => {
     e?.stopPropagation();
-    if (editValue.trim()) { onRename(editValue.trim()); setIsEditing(false); } 
-    else { setIsEditing(false); setEditValue(labelName); }
+    onRename(editValue.trim()); 
+    setIsEditing(false);
   };
 
   if (!isOpen || !position) return null;
@@ -108,78 +123,113 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   return createPortal(
     <div 
       ref={menuRef}
-      className="fixed z-[9999] w-64 bg-canvas-900 border border-canvas-700 rounded-lg shadow-2xl shadow-black/60 overflow-hidden font-sans text-sm animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-[9999] w-80 bg-canvas-900 border border-canvas-700 rounded-xl shadow-2xl shadow-black/80 font-sans text-sm animate-in fade-in zoom-in-95 duration-100 flex flex-col"
       style={{ top: position.top, left: position.left }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="bg-canvas-950 px-3 py-2 border-b border-canvas-800 flex items-center justify-between">
-        <span className="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Section Settings</span>
-        <button onClick={onClose} className="text-canvas-500 hover:text-white"><X size={14} /></button>
+      {/* Header */}
+      <div className="bg-canvas-950/80 px-4 py-2.5 border-b border-canvas-800 flex items-center justify-between rounded-t-xl shrink-0">
+        <span className="text-[10px] font-bold text-brand-500 uppercase tracking-widest flex items-center gap-1.5">
+            <Tag size={12}/> Section Settings
+        </span>
+        <button onClick={onClose} className="text-canvas-500 hover:text-white p-1 rounded hover:bg-white/5 transition-colors"><X size={14} /></button>
       </div>
 
-      <div className="p-1 space-y-0.5">
-        {isEditing ? (
-            <div className="px-2 py-2 flex items-center gap-1">
-                <input 
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') handleSaveRename(e); }}
-                    className="flex-1 bg-canvas-950 border border-brand-500/50 rounded px-2 py-1 text-xs text-white focus:outline-none"
-                    autoFocus
-                />
-                <button onClick={handleSaveRename} className="p-1 text-emerald-400 hover:bg-emerald-900/30 rounded"><Check size={14} /></button>
-            </div>
-        ) : (
-            <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left transition-colors">
-              <FileEdit size={14} /> Rename
-            </button>
-        )}
+      {/* Content - No Scrolling */}
+      <div className="p-3 flex flex-col gap-4">
+        
+        {/* Rename & Identity Block */}
+        <div className="space-y-3">
+            {isEditing ? (
+                <div className="flex items-center gap-1">
+                    <input 
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') handleSaveRename(e); }}
+                        className="flex-1 bg-canvas-950 border border-brand-500/50 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        autoFocus
+                        placeholder="Label Name"
+                    />
+                    <button onClick={handleSaveRename} className="p-2 bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 rounded"><Check size={14} /></button>
+                </div>
+            ) : (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} 
+                    className="w-full flex items-center justify-between px-3 py-2 bg-canvas-800/50 hover:bg-canvas-800 text-white rounded border border-canvas-700/50 hover:border-canvas-600 transition-all group"
+                >
+                    <span className="font-semibold truncate pr-2">{labelName || 'Untitled Label'}</span>
+                    <FileEdit size={14} className="text-canvas-500 group-hover:text-brand-400" />
+                </button>
+            )}
 
-        <div className="px-3 py-2">
-          <div className="flex items-center gap-2 mb-2 text-[10px] text-canvas-500 uppercase font-bold tracking-wider">
-            <Palette size={10} /> Color Tag
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {colors.map(c => (
-              <button
-                key={c}
-                onClick={() => onColorChange(c)}
-                className={`w-5 h-5 rounded border border-white/5 hover:scale-110 transition-transform ${currentColor === c ? 'ring-2 ring-white ring-offset-1 ring-offset-canvas-900' : ''}`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
+            {/* Visuals Row */}
+            <div className="space-y-3">
+                 {/* Icons Grid (Compact 2 rows) */}
+                 <div>
+                    <div className="flex items-center justify-between mb-1.5 px-1">
+                        <span className="text-[10px] text-canvas-500 uppercase font-bold tracking-wider">Icon</span>
+                    </div>
+                    <div className="grid grid-cols-10 gap-1">
+                        {Object.entries(LABEL_ICONS).map(([key, IconComponent]) => (
+                            <button
+                                key={key}
+                                onClick={() => onIconChange(key)}
+                                className={`h-7 rounded-sm flex items-center justify-center hover:bg-white/10 transition-colors ${currentIcon === key ? 'text-white bg-white/20 ring-1 ring-white/30' : 'text-canvas-500'}`}
+                                title={key}
+                            >
+                                <IconComponent size={14} />
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Colors */}
+                <div>
+                    <div className="text-[10px] text-canvas-500 uppercase font-bold tracking-wider mb-1.5 px-1">Color</div>
+                    <div className="flex gap-2">
+                        {colors.map(c => (
+                        <button
+                            key={c}
+                            onClick={() => onColorChange(c)}
+                            className={`flex-1 h-5 rounded-sm border border-white/5 hover:scale-105 transition-all ${currentColor === c ? 'ring-2 ring-white ring-offset-1 ring-offset-canvas-900' : 'opacity-70 hover:opacity-100'}`}
+                            style={{ backgroundColor: c }}
+                        />
+                        ))}
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div className="h-px bg-canvas-800 my-1" />
+        <div className="h-px bg-canvas-800 w-full" />
 
-        <button onClick={(e) => { e.stopPropagation(); onSaveToLibrary(); }} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left transition-colors">
-          <FolderPlus size={14} /> Save to Library
-        </button>
+        {/* Management Actions (Grid) */}
+        <div className="grid grid-cols-2 gap-2">
+            <button onClick={(e) => { e.stopPropagation(); onSaveToLibrary(); }} className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-canvas-300 hover:text-white bg-canvas-800/30 hover:bg-canvas-800 border border-transparent hover:border-canvas-600 rounded transition-all">
+                <FolderPlus size={14} className="text-purple-400" /> Save Preset
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onCopySection(); }} className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-canvas-300 hover:text-white bg-canvas-800/30 hover:bg-canvas-800 border border-transparent hover:border-canvas-600 rounded transition-all">
+                <Copy size={14} className="text-sky-400" /> Copy JSON
+            </button>
+            
+            <button onClick={(e) => { e.stopPropagation(); onMoveUp(); }} disabled={isFirst} className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-canvas-300 hover:text-white bg-canvas-800/30 hover:bg-canvas-800 border border-transparent hover:border-canvas-600 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                <ArrowUp size={14} /> Move Up
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onMoveDown(); }} disabled={isLast} className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-canvas-300 hover:text-white bg-canvas-800/30 hover:bg-canvas-800 border border-transparent hover:border-canvas-600 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                <ArrowDown size={14} /> Move Down
+            </button>
+        </div>
 
-        <button onClick={(e) => { e.stopPropagation(); onCopySection(); }} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left transition-colors">
-          <Copy size={14} /> Copy Section
-        </button>
-
-        <div className="h-px bg-canvas-800 my-1" />
-
-        <button onClick={(e) => { e.stopPropagation(); onMoveUp(); }} disabled={isFirst} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left disabled:opacity-30">
-          <ArrowUp size={14} /> Move Up
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); onMoveDown(); }} disabled={isLast} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-300 hover:bg-canvas-800 rounded text-left disabled:opacity-30">
-          <ArrowDown size={14} /> Move Down
-        </button>
-
-        <div className="h-px bg-canvas-800 my-1" />
-
-        <button onClick={(e) => { e.stopPropagation(); onDeleteLabel(); }} className="w-full flex items-center gap-3 px-3 py-2 text-canvas-400 hover:bg-canvas-800 hover:text-red-400 rounded text-left">
-          <Tag size={14} /> Remove Label
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); onDeleteSection(); }} className="w-full flex items-center gap-3 px-3 py-2 text-red-400 hover:bg-red-900/20 rounded text-left">
-          <Trash2 size={14} /> Delete Section
-        </button>
+        {/* Destructive Actions (Grid) */}
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-canvas-800">
+            <button onClick={(e) => { e.stopPropagation(); onDeleteLabel(); }} className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-canvas-400 hover:text-red-300 hover:bg-red-900/10 rounded transition-colors">
+                <Tag size={14} /> Remove Label
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onDeleteSection(); }} className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:text-white hover:bg-red-600 rounded transition-colors shadow-sm">
+                <Trash2 size={14} /> Delete All
+            </button>
+        </div>
       </div>
     </div>,
     document.body

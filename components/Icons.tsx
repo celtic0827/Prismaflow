@@ -44,8 +44,52 @@ import {
   CheckSquare,
   Square,
   Type,
-  FolderOpen
+  FolderOpen,
+  // New Icons for Labels
+  Image,
+  Camera,
+  User,
+  Sun,
+  Box,
+  MapPin,
+  Aperture,
+  Eye,
+  Monitor,
+  Grid,
+  Film,
+  Feather,
+  Smile,
+  Skull,
+  Ghost,
+  Cpu,
+  Globe,
+  Music,
+  Video
 } from 'lucide-react';
+
+// Map for dynamic lookup
+export const LABEL_ICONS: { [key: string]: any } = {
+  'Tag': Tag,
+  'Image': Image,
+  'Camera': Camera,
+  'User': User,
+  'Sun': Sun,
+  'Palette': Palette,
+  'Layers': Layers,
+  'Box': Box,
+  'MapPin': MapPin,
+  'Clock': Clock,
+  'Aperture': Aperture,
+  'Wand2': Wand2,
+  'Sparkles': Sparkles,
+  'Eye': Eye,
+  'Monitor': Monitor,
+  'Grid': Grid,
+  'Film': Film,
+  'Feather': Feather,
+  'Smile': Smile,
+  'Skull': Skull
+};
 
 export { 
   Sparkles, 
@@ -92,5 +136,24 @@ export {
   CheckSquare,
   Square,
   Type,
-  FolderOpen
+  FolderOpen,
+  Image,
+  Camera,
+  User,
+  Sun,
+  Box,
+  MapPin,
+  Aperture,
+  Eye,
+  Monitor,
+  Grid,
+  Film,
+  Feather,
+  Smile,
+  Skull,
+  Ghost,
+  Cpu,
+  Globe,
+  Music,
+  Video
 };

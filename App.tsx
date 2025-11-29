@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -33,7 +34,8 @@ import {
   Package,
   HelpCircle,
   Type,
-  FolderOpen
+  FolderOpen,
+  LABEL_ICONS // Import label icon map
 } from './components/Icons';
 import { Segment, SelectionState, groupSegments, SectionGroup, SavedProject, SegmentType, OptionPreset, SectionPreset } from './types';
 import { Modal } from './components/Modal';
@@ -320,26 +322,26 @@ export default function App() {
   // --- Initialization ---
   const initialSegments: Segment[] = [
     // Removed "Create an " text to allow Label to be first visually (normalizeSegments will add an empty text segment)
-    { id: uuidv4(), type: 'label', content: 'Composition', color: LABEL_COLORS[0] }, 
+    { id: uuidv4(), type: 'label', content: 'Composition', color: LABEL_COLORS[0], icon: 'Layers' }, 
     { id: uuidv4(), type: 'text', content: 'editorial fashion photography, wide shot, three models standing in a ' },
     { id: uuidv4(), type: 'random', content: ['minimalist concrete hall', 'neon-lit subway', 'industrial warehouse'], activeValue: 'minimalist concrete hall' },
     { id: uuidv4(), type: 'text', content: '. High contrast lighting. \n' },
     
-    { id: uuidv4(), type: 'label', content: 'Model_Left', color: LABEL_COLORS[1] }, 
+    { id: uuidv4(), type: 'label', content: 'Model_Left', color: LABEL_COLORS[1], icon: 'User' }, 
     { id: uuidv4(), type: 'text', content: 'Left figure wearing ' },
     { id: uuidv4(), type: 'random', content: ['an oversized trench coat', 'a vinyl jacket', 'a denim blazer'], activeValue: 'an oversized trench coat' },
     { id: uuidv4(), type: 'text', content: ' and ' },
     { id: uuidv4(), type: 'random', content: ['baggy cargo trousers', 'wide-leg pants', 'distressed jeans'], activeValue: 'baggy cargo trousers' },
     { id: uuidv4(), type: 'text', content: '. \n' },
 
-    { id: uuidv4(), type: 'label', content: 'Model_Center', color: LABEL_COLORS[3] },
+    { id: uuidv4(), type: 'label', content: 'Model_Center', color: LABEL_COLORS[3], icon: 'User' },
     { id: uuidv4(), type: 'text', content: 'Center figure in ' },
     { id: uuidv4(), type: 'random', content: ['a metallic silver bodysuit', 'a matte black vest', 'an asymmetric dress'], activeValue: 'a metallic silver bodysuit' },
     { id: uuidv4(), type: 'text', content: ' with ' },
     { id: uuidv4(), type: 'random', content: ['geometric sunglasses', 'a chrome face mask', 'silver chains'], activeValue: 'geometric sunglasses' },
     { id: uuidv4(), type: 'text', content: '. \n' },
 
-    { id: uuidv4(), type: 'label', content: 'Model_Right', color: LABEL_COLORS[2] },
+    { id: uuidv4(), type: 'label', content: 'Model_Right', color: LABEL_COLORS[2], icon: 'User' },
     { id: uuidv4(), type: 'text', content: 'Right figure dressed in ' },
     { id: uuidv4(), type: 'random', content: ['a silk shirt', 'a puffer vest', 'a mesh turtleneck'], activeValue: 'a silk shirt' },
     { id: uuidv4(), type: 'text', content: ' and ' },
@@ -733,7 +735,8 @@ export default function App() {
 
   const addLabel = () => {
     const color = LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)];
-    const newLabel: Segment = { id: uuidv4(), type: 'label', content: 'New Label', color: color };
+    // New labels now start empty and with a default 'Tag' icon
+    const newLabel: Segment = { id: uuidv4(), type: 'label', content: '', color: color, icon: 'Tag' };
     let newSegments = [...segments];
     
     if (selection.startId) {
@@ -1632,6 +1635,10 @@ export default function App() {
                         currentHighlightColor = seg.color || DEFAULT_TEXT_COLOR;
                         const groupIndex = groupsForCalc.findIndex(g => g.labelSegment?.id === seg.id);
                         const isMenuOpen = activeLabelMenuId === seg.id;
+                        
+                        // Icon Resolution
+                        const IconComponent = seg.icon && LABEL_ICONS[seg.icon] ? LABEL_ICONS[seg.icon] : Tag;
+
                         return (
                         <span 
                             key={seg.id}
@@ -1641,18 +1648,21 @@ export default function App() {
                             className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider select-none mx-1 align-baseline cursor-pointer hover:ring-1 hover:ring-white/20 relative ${isMenuOpen ? 'z-50' : 'z-auto'}`}
                             style={{ backgroundColor: `${seg.color}20`, color: seg.color || DEFAULT_TEXT_COLOR, border: `1px solid ${seg.color}40` }} 
                             onClick={(e) => { e.stopPropagation(); setActiveLabelMenuId(activeLabelMenuId === seg.id ? null : seg.id); }}
+                            title="Click to edit section settings"
                         >
-                            <Tag size={10} style={{ color: seg.color }} />
-                            {seg.content}
+                            <IconComponent size={12} style={{ color: seg.color }} />
+                            {seg.content && <span className="truncate max-w-[120px] md:max-w-[300px]">{seg.content}</span>}
                             <LabelMenu 
                                 isOpen={isMenuOpen}
                                 onClose={() => setActiveLabelMenuId(null)}
                                 anchorRef={{ current: labelRefs.current[seg.id] || null }}
                                 labelName={seg.content as string}
                                 currentColor={seg.color || DEFAULT_TEXT_COLOR}
+                                currentIcon={seg.icon || 'Tag'}
                                 colors={LABEL_COLORS}
                                 onRename={(name) => handleUpdateLabel(seg.id, { content: name })}
                                 onColorChange={(color) => handleUpdateLabel(seg.id, { color: color })}
+                                onIconChange={(iconKey) => handleUpdateLabel(seg.id, { icon: iconKey })}
                                 onMoveUp={() => handleMoveSection(seg.id, 'up')}
                                 onMoveDown={() => handleMoveSection(seg.id, 'down')}
                                 onCopySection={() => handleCopySection(seg.id)}

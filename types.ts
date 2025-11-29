@@ -15,6 +15,8 @@ export interface Segment {
   disabledIndices?: number[];
   // For label segments: the highlight color
   color?: string;
+  // For label segments: the icon identifier
+  icon?: string;
 }
 
 export interface SelectionState {
