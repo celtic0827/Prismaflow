@@ -33,7 +33,8 @@ import {
   LayoutTemplate,
   Package,
   HelpCircle,
-  Type
+  Type,
+  FolderOpen
 } from './components/Icons';
 import { Segment, SelectionState, groupSegments, SectionGroup, SavedProject, SegmentType, OptionPreset, SectionPreset } from './types';
 import { Modal } from './components/Modal';
@@ -50,15 +51,15 @@ const getRandom = (arr: string[]) => {
 // Custom MIME type for internal copy/paste
 const ALCHEMIST_MIME_TYPE = 'application/x-prismaflow-fragment';
 
-// Colors for labels - Modern Code Editor Palette (Neon/Vibrant)
+// Colors for labels - Adjusted to 500 scale for reduced eye fatigue (Less Neon)
 const LABEL_COLORS = [
-  '#38bdf8', // Sky 400
-  '#4ade80', // Green 400
-  '#fb923c', // Orange 400
-  '#c084fc', // Purple 400
-  '#f472b6', // Pink 400
-  '#2dd4bf', // Teal 400
-  '#facc15', // Yellow 400
+  '#0ea5e9', // Sky 500
+  '#22c55e', // Green 500
+  '#f97316', // Orange 500
+  '#a855f7', // Purple 500
+  '#ec4899', // Pink 500
+  '#14b8a6', // Teal 500
+  '#eab308', // Yellow 500
 ];
 
 const DEFAULT_TEXT_COLOR = '#94a3b8'; // Slate 400 (Muted for default text)
@@ -308,7 +309,7 @@ const EditableSpan: React.FC<EditableSpanProps> = ({
       style={{ 
         whiteSpace: 'pre-wrap', // Strictly enforce pre-wrap to handle \n correctly
         display: needsPlaceholder ? 'inline-block' : 'inline', 
-        minWidth: needsPlaceholder ? '4px' : undefined, // Visible width for empty placeholder
+        minWidth: needsPlaceholder ? '2px' : undefined, // Visible width for empty placeholder
         minHeight: needsPlaceholder ? '1.5em' : undefined, // Ensure empty lines have height
         color: color || DEFAULT_TEXT_COLOR 
       }} 
@@ -409,6 +410,8 @@ export default function App() {
   
   // Sidebar State
   const [activeSidebarTab, setActiveSidebarTab] = useState<'library' | 'projects'>('library');
+  const [selectedLibraryOptionId, setSelectedLibraryOptionId] = useState<string | null>(null);
+  const [selectedSidebarProjectId, setSelectedSidebarProjectId] = useState<string | null>(null);
 
   // Editing State
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
@@ -436,6 +439,12 @@ export default function App() {
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // --- Actions ---
+
+  // Global click handler to deselect sidebar items
+  const handleGlobalClick = () => {
+    setSelectedLibraryOptionId(null);
+    setSelectedSidebarProjectId(null);
+  };
   
   const updateSegments = (newSegments: Segment[], shouldSaveSnapshot = true) => {
       // Must clone and normalize to ensure clean state history
@@ -1359,8 +1368,22 @@ export default function App() {
       showNotification("Project Loaded");
   };
   
-  const handleDeleteProject = (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
+  const handleDuplicateSavedProject = () => {
+    if (!selectedSidebarProjectId) return;
+    const p = savedProjects.find(x => x.id === selectedSidebarProjectId);
+    if (!p) return;
+
+    const newProject: SavedProject = {
+        ...p,
+        id: uuidv4(),
+        name: `${p.name} (Copy)`,
+        updatedAt: Date.now()
+    };
+    setSavedProjects(prev => [newProject, ...prev]);
+    showNotification("Project Duplicated");
+  };
+
+  const handleDeleteProject = (id: string) => {
       const p = savedProjects.find(x => x.id === id);
       if (p) setDeleteTarget({ type: 'project', id, name: p.name });
   };
@@ -1494,8 +1517,10 @@ export default function App() {
               setCurrentProjectId(null);
               showNotification("Project Deleted (Workspace Unsaved)");
           }
+          if (selectedSidebarProjectId === id) setSelectedSidebarProjectId(null);
       } else if (type === 'option') {
           setOptionPresets(prev => prev.filter(p => p.id !== id));
+          if (selectedLibraryOptionId === id) setSelectedLibraryOptionId(null); // Clear selection on delete
       } else if (type === 'section') {
           setSectionPresets(prev => prev.filter(p => p.id !== id));
       }
@@ -1505,7 +1530,7 @@ export default function App() {
   if (!segments) return <div className="min-h-screen bg-canvas-950 flex items-center justify-center text-canvas-500 font-mono">Loading Prismaflow...</div>;
 
   return (
-    <div className="min-h-screen bg-canvas-950 flex flex-col items-center py-10 px-4 md:px-8">
+    <div className="min-h-screen bg-canvas-950 flex flex-col items-center py-10 px-4 md:px-8" onClick={handleGlobalClick}>
       <input type="file" ref={fileInputRef} onChange={handleImportCSV} className="hidden" />
       <input type="file" ref={backupFileInputRef} onChange={handleImportBackup} accept=".json" className="hidden" />
       
@@ -1518,7 +1543,7 @@ export default function App() {
 
       {/* Help Button - Conditional render inside Modal check, but Button is always visible */}
       <button 
-        onClick={() => setIsHelpModalOpen(true)}
+        onClick={(e) => { e.stopPropagation(); setIsHelpModalOpen(true); }}
         className="fixed z-50 p-2 text-canvas-500 hover:text-brand-400 transition-colors bg-canvas-900/50 rounded-full border border-canvas-800 hover:border-brand-500/50 right-4 bottom-6 lg:bottom-auto lg:top-6 lg:right-6"
         title="Help & Guide"
       >
@@ -1537,7 +1562,7 @@ export default function App() {
         {/* Left Column (Toolbar + Editor) */}
         <div className="flex-1 w-full min-w-0 flex flex-col h-auto lg:h-full gap-4">
             {/* Toolbar - FIXED: Consistent px-3 py-2 padding, smaller text */}
-            <div className="bg-canvas-900 border border-canvas-800 rounded-lg px-3 py-2 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
+            <div className="bg-canvas-900 border border-canvas-800 rounded-lg px-3 py-2 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0" onClick={e => e.stopPropagation()}>
                 <div className="flex-1 w-full md:w-auto flex gap-2 items-center">
                     <input type="text" value={promptName} onChange={e => setPromptName(e.target.value)} className="bg-transparent text-sm font-bold text-white w-full focus:outline-none" placeholder="Untitled Project" />
                     {currentProjectId && <span className={`text-[10px] px-2 py-0.5 rounded-full border ${!isDirty ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-400'}`}>{!isDirty ? 'Synced' : 'Edited'}</span>}
@@ -1639,7 +1664,7 @@ export default function App() {
                         >
                             {/* Value Display */}
                             <span 
-                                className={`px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[200px] truncate font-mono text-sm ${allDisabled ? 'text-canvas-600' : ''}`}
+                                className={`px-2 py-0.5 cursor-pointer hover:text-brand-100 transition-colors max-w-[100px] lg:max-w-[200px] truncate font-mono text-sm ${allDisabled ? 'text-canvas-600' : ''}`}
                                 title={`Options: ${(seg.content as string[]).join(', ')}`}
                             >
                                 {seg.activeValue || '(empty)'}
@@ -1678,7 +1703,7 @@ export default function App() {
                 })}
             </div>
 
-            <div className="bg-canvas-950 border border-canvas-800 rounded-lg flex flex-col shrink-0 min-h-[140px]">
+            <div className="bg-canvas-950 border border-canvas-800 rounded-lg flex flex-col shrink-0 min-h-[140px]" onClick={e => e.stopPropagation()}>
                 {/* Generated Prompt Header - FIXED: Consistent px-3 py-2 padding */}
                 <div className="bg-canvas-900/50 px-3 py-2 border-b border-canvas-800 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-xs text-canvas-500 font-bold uppercase tracking-widest"><Terminal size={14}/> Generated Prompt</div>
@@ -1694,7 +1719,10 @@ export default function App() {
         </div>
 
         {/* Tabbed Sidebar - Mobile: h-auto allows it to flow naturally. Desktop: Fixed width & full height. */}
-        <div className="w-full lg:w-72 flex-shrink-0 h-auto lg:h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden">
+        <div 
+            className="w-full lg:w-72 flex-shrink-0 h-auto lg:h-full flex flex-col bg-canvas-900 border border-canvas-800 rounded-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()} // Stop propagation here to prevent sidebar interaction from deselecting items
+        >
              
              {/* Tab Header - FIXED: Consistent py-2 padding */}
              <div className="flex shrink-0 border-b border-canvas-800">
@@ -1717,31 +1745,80 @@ export default function App() {
                  <div className="flex flex-col lg:flex-1 lg:overflow-hidden">
                      {/* 1. Option Presets */}
                      <div className="flex flex-col lg:flex-1 lg:min-h-0 border-b border-canvas-800">
-                         {/* Library Headers - FIXED: Consistent px-3 py-2 padding */}
-                         <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between">
-                            <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><Folder size={12}/> Options</h4>
-                            <button 
-                                onClick={handleOpenSavePresetModal}
-                                disabled={!selectedOptionId}
-                                className="p-1 rounded hover:bg-brand-600/20 text-brand-400 hover:text-brand-300 disabled:opacity-20 transition-colors"
-                                title="Save selected Option"
-                            >
-                                <Plus size={14}/>
-                            </button>
+                         {/* Library Headers - Refactored for Centralized Toolbar */}
+                         <div className="px-3 py-2 bg-canvas-950/30 flex items-center justify-between border-b border-canvas-800">
+                            <div className="flex items-center gap-2">
+                                <h4 className="text-canvas-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"><Folder size={12}/> Options</h4>
+                            </div>
+                            <div className="flex items-center gap-0.5">
+                                {/* Save New (From Canvas) */}
+                                <button 
+                                    onClick={handleOpenSavePresetModal}
+                                    disabled={!selectedOptionId}
+                                    className="p-1.5 rounded hover:bg-brand-600/20 text-brand-400 hover:text-brand-300 disabled:opacity-20 transition-colors"
+                                    title="Save selected Block to Library"
+                                >
+                                    <FolderPlus size={14}/>
+                                </button>
+                                
+                                <div className="w-px h-3 bg-canvas-800 mx-1"></div>
+
+                                {/* Actions for Selected Preset */}
+                                <button 
+                                    onClick={() => { const p = optionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleInsertPreset(p); }}
+                                    disabled={!selectedLibraryOptionId}
+                                    className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
+                                    title="Insert Selected"
+                                >
+                                    <ClipboardPaste size={14}/>
+                                </button>
+                                <button 
+                                    onClick={() => { const p = optionPresets.find(x => x.id === selectedLibraryOptionId); if(p) handleReplacePreset(p); }}
+                                    disabled={!selectedLibraryOptionId || !selectedOptionId}
+                                    className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
+                                    title="Swap with Selected Block"
+                                >
+                                    <ArrowRightLeft size={14}/>
+                                </button>
+                                <button 
+                                    onClick={() => setEditingPresetId(selectedLibraryOptionId)}
+                                    disabled={!selectedLibraryOptionId}
+                                    className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
+                                    title="Edit Preset"
+                                >
+                                    <Edit3 size={14}/>
+                                </button>
+                                <button 
+                                    onClick={() => selectedLibraryOptionId && handleDeletePreset(selectedLibraryOptionId)}
+                                    disabled={!selectedLibraryOptionId}
+                                    className="p-1.5 rounded hover:bg-red-900/30 text-canvas-400 hover:text-red-400 disabled:opacity-20 transition-colors"
+                                    title="Delete Preset"
+                                >
+                                    <Trash2 size={14}/>
+                                </button>
+                            </div>
                          </div>
-                         <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
+
+                         {/* Options List - Refactored for Selection */}
+                         <div 
+                             className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar"
+                             onClick={() => setSelectedLibraryOptionId(null)} // Click empty space to deselect
+                         >
                              {optionPresets.length === 0 && <div className="py-6 text-center text-canvas-600 text-xs italic">No options saved</div>}
                              {optionPresets.map(preset => (
-                                <div key={preset.id} className="group border border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800 rounded-md p-2 transition-all">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-xs font-bold text-canvas-300 group-hover:text-white truncate">{preset.name}</span>
-                                        <button onClick={() => setEditingPresetId(preset.id)} className="opacity-0 group-hover:opacity-100 text-canvas-500 hover:text-white"><Edit3 size={10} /></button>
-                                    </div>
-                                    <div className="flex gap-1">
-                                        <button onClick={() => handleInsertPreset(preset)} className="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] bg-canvas-700 hover:bg-brand-600 text-canvas-300 hover:text-white rounded transition-colors">Add</button>
-                                        <button onClick={() => handleReplacePreset(preset)} disabled={!selectedOptionId} className="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] bg-canvas-700 hover:bg-brand-600 text-canvas-300 hover:text-white rounded disabled:opacity-30 disabled:hover:bg-canvas-700">Swap</button>
-                                        <button onClick={() => handleDeletePreset(preset.id)} className="px-1.5 py-1 bg-canvas-700 hover:bg-red-500 text-canvas-400 hover:text-white rounded"><Trash2 size={10}/></button>
-                                    </div>
+                                <div 
+                                    key={preset.id} 
+                                    onClick={(e) => { e.stopPropagation(); setSelectedLibraryOptionId(preset.id === selectedLibraryOptionId ? null : preset.id); }}
+                                    className={`group border cursor-pointer rounded-md px-3 py-2 transition-all flex items-center justify-between
+                                        ${selectedLibraryOptionId === preset.id 
+                                            ? 'bg-brand-900/20 border-brand-500/50' 
+                                            : 'border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800'
+                                        }`}
+                                >
+                                    <span className={`text-xs font-bold truncate ${selectedLibraryOptionId === preset.id ? 'text-brand-200' : 'text-canvas-300 group-hover:text-white'}`}>
+                                        {preset.name}
+                                    </span>
+                                    {selectedLibraryOptionId === preset.id && <div className="w-1.5 h-1.5 rounded-full bg-brand-500"></div>}
                                 </div>
                              ))}
                          </div>
@@ -1763,7 +1840,7 @@ export default function App() {
                                         <span className="text-[10px] text-canvas-500">{preset.data.length} segments</span>
                                     </div>
                                     <div className="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleInsertSectionPreset(preset)} className="p-1.5 bg-canvas-700 hover:bg-brand-600 text-canvas-300 hover:text-white rounded" title="Insert Section"><Plus size={12}/></button>
+                                        <button onClick={() => handleInsertSectionPreset(preset)} className="p-1.5 bg-canvas-700 hover:bg-brand-600 text-canvas-300 hover:text-white rounded" title="Insert Section"><ClipboardPaste size={12}/></button>
                                         <button onClick={() => handleDeleteSectionPreset(preset.id)} className="p-1.5 bg-canvas-700 hover:bg-red-500 text-canvas-300 hover:text-white rounded" title="Delete Section"><Trash2 size={12}/></button>
                                     </div>
                                 </div>
@@ -1775,17 +1852,67 @@ export default function App() {
 
              {/* Tab Content: Projects */}
              {activeSidebarTab === 'projects' && (
-                 <div className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
-                     {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full text-canvas-600 space-y-3 text-center p-4"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
-                     {savedProjects.map(p => (
-                        <div key={p.id} onClick={() => handleLoadProject(p)} className={`group border rounded-md p-3 cursor-pointer ${currentProjectId === p.id ? 'bg-brand-900/10 border-brand-500/40' : 'bg-transparent border-transparent hover:bg-canvas-800 hover:border-canvas-700'}`}>
-                            <div className="flex justify-between items-start">
-                                <h4 className={`text-sm font-medium truncate pr-2 ${currentProjectId === p.id ? 'text-brand-200' : 'text-canvas-300 group-hover:text-white'}`}>{p.name}</h4>
-                                <button onClick={(e) => handleDeleteProject(p.id, e)} className="text-canvas-600 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1 hover:bg-canvas-900 rounded"><X size={12}/></button>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[10px] text-canvas-500 mt-1.5 font-mono"><Clock size={10}/>{new Date(p.updatedAt).toLocaleDateString()}</div>
+                 <div className="flex flex-col lg:flex-1 lg:overflow-hidden relative">
+                     {/* Projects Header - Centralized Toolbar */}
+                     <div className="px-3 py-2 flex items-center justify-end border-b border-canvas-800 shrink-0 relative z-20 overflow-hidden">
+                        
+                        <div className="flex items-center gap-0.5 relative z-10">
+                            {/* Load */}
+                            <button 
+                                onClick={() => { const p = savedProjects.find(x => x.id === selectedSidebarProjectId); if(p) handleLoadProject(p); }}
+                                disabled={!selectedSidebarProjectId}
+                                className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
+                                title="Open Project"
+                            >
+                                <FolderOpen size={14}/>
+                            </button>
+                            
+                            {/* Duplicate */}
+                            <button 
+                                onClick={handleDuplicateSavedProject}
+                                disabled={!selectedSidebarProjectId}
+                                className="p-1.5 rounded hover:bg-canvas-700 text-canvas-400 hover:text-white disabled:opacity-20 transition-colors"
+                                title="Duplicate Project"
+                            >
+                                <Copy size={14}/>
+                            </button>
+                            
+                            {/* Delete */}
+                            <button 
+                                onClick={() => selectedSidebarProjectId && handleDeleteProject(selectedSidebarProjectId)}
+                                disabled={!selectedSidebarProjectId}
+                                className="p-1.5 rounded hover:bg-red-900/30 text-canvas-400 hover:text-red-400 disabled:opacity-20 transition-colors"
+                                title="Delete Project"
+                            >
+                                <Trash2 size={14}/>
+                            </button>
                         </div>
-                     ))}
+                     </div>
+                     
+                     <div 
+                         className="p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 pb-32"
+                         onClick={() => setSelectedSidebarProjectId(null)} // Click empty space to deselect
+                     >
+                         {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full text-canvas-600 space-y-3 text-center p-4 mt-10"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
+                         {savedProjects.map(p => (
+                            <div 
+                                key={p.id} 
+                                onClick={(e) => { e.stopPropagation(); setSelectedSidebarProjectId(p.id === selectedSidebarProjectId ? null : p.id); }}
+                                className={`group border rounded-md p-3 cursor-pointer transition-all relative z-20 backdrop-blur-sm
+                                    ${selectedSidebarProjectId === p.id
+                                        ? 'bg-brand-900/40 border-brand-500/50'
+                                        : 'bg-canvas-900/40 border-canvas-800/50 hover:bg-canvas-800 hover:border-canvas-700'
+                                    }
+                                `}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <h4 className={`text-sm font-medium truncate pr-2 ${currentProjectId === p.id ? 'text-emerald-400' : selectedSidebarProjectId === p.id ? 'text-brand-200' : 'text-canvas-300 group-hover:text-white'}`}>{p.name}</h4>
+                                    {currentProjectId === p.id && <span className="text-[9px] uppercase tracking-widest text-emerald-500 font-bold border border-emerald-500/30 px-1.5 rounded">Active</span>}
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[10px] text-canvas-500 mt-1.5 font-mono"><Clock size={10}/>{new Date(p.updatedAt).toLocaleDateString()}</div>
+                            </div>
+                         ))}
+                     </div>
                  </div>
              )}
         </div>
@@ -1796,7 +1923,7 @@ export default function App() {
       {/* Editor Modal (Used for both Canvas Blocks and Library Presets) */}
       {isEditorOpen && (
         <Modal isOpen={isEditorOpen} onClose={handleCloseEditor} title={editingPresetId ? "Edit Preset Options" : "Edit Block Options"}>
-          <div className="space-y-6">
+          <div className="space-y-6" onClick={e => e.stopPropagation()}>
              <RandomizerEditor 
                 options={currentEditingData.options} 
                 disabledIndices={currentEditingData.disabledIndices}
@@ -1814,7 +1941,7 @@ export default function App() {
       {/* Save Preset Modal - Conditionally Rendered */}
       {isSavePresetModalOpen && (
         <Modal isOpen={isSavePresetModalOpen} onClose={() => setIsSavePresetModalOpen(false)} title="Save Option Preset">
-           <div className="space-y-4 font-sans">
+           <div className="space-y-4 font-sans" onClick={e => e.stopPropagation()}>
                <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
                    <FolderPlus className="text-brand-400" size={18} />
                    <p className="text-xs text-brand-200">
@@ -1844,7 +1971,7 @@ export default function App() {
       {/* Save Section Modal - Conditionally Rendered */}
       {isSaveSectionModalOpen && (
         <Modal isOpen={isSaveSectionModalOpen} onClose={() => setIsSaveSectionModalOpen(false)} title="Save Section to Library">
-           <div className="space-y-4 font-sans">
+           <div className="space-y-4 font-sans" onClick={e => e.stopPropagation()}>
                <div className="bg-brand-900/20 p-3 rounded border border-brand-500/30 flex items-center gap-3">
                    <LayoutTemplate className="text-brand-400" size={18} />
                    <p className="text-xs text-brand-200">
@@ -1874,25 +2001,24 @@ export default function App() {
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Confirm Deletion">
-            <div className="space-y-4 font-sans">
+            <div className="space-y-4 font-sans" onClick={e => e.stopPropagation()}>
                 <div className="bg-red-900/20 p-3 rounded border border-red-500/30 flex items-center gap-3">
                    <Trash2 className="text-red-400" size={18} />
                    <p className="text-xs text-red-200">
-                       Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
-                       <br/>This action cannot be undone.
+                       Are you sure you want to delete <strong className="text-white">"{deleteTarget.name}"</strong>? This action cannot be undone.
                    </p>
-               </div>
-               <div className="flex justify-end gap-2 pt-2">
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
                    <button onClick={() => setDeleteTarget(null)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
                    <button onClick={executeDelete} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-bold shadow-lg shadow-red-500/20">Delete Forever</button>
-               </div>
+                </div>
             </div>
         </Modal>
       )}
 
-      {/* Help Modal - Conditionally Rendered */}
+      {/* Help Modal */}
       {isHelpModalOpen && (
-        <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+          <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
       )}
     </div>
   );

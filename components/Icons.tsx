@@ -43,7 +43,8 @@ import {
   HelpCircle,
   CheckSquare,
   Square,
-  Type
+  Type,
+  FolderOpen
 } from 'lucide-react';
 
 export { 
@@ -90,5 +91,6 @@ export {
   HelpCircle,
   CheckSquare,
   Square,
-  Type
+  Type,
+  FolderOpen
 };
