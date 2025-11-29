@@ -433,6 +433,8 @@ export default function App() {
   
   // Delete Confirmation State
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'project' | 'option' | 'section', id: string, name: string } | null>(null);
+  // Overwrite Confirmation State
+  const [overwriteTarget, setOverwriteTarget] = useState<{ id: string, name: string } | null>(null);
 
   const labelRefs = useRef<{[key: string]: HTMLElement | null}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -993,19 +995,52 @@ export default function App() {
 
   const confirmSaveSection = () => {
       if (!savingSectionId || !presetNameInput.trim()) return; // Use preserved ID
+      
+      const name = presetNameInput.trim();
+      const existing = sectionPresets.find(p => p.name === name);
+
+      if (existing) {
+          // Trigger Overwrite Modal, hide Input Modal
+          // Do NOT clear savingSectionId yet, we need it for the overwrite
+          setIsSaveSectionModalOpen(false); 
+          setOverwriteTarget({ id: existing.id, name: existing.name });
+      } else {
+          // Create New
+          const group = groupSegments(segments).find(g => g.labelSegment?.id === savingSectionId);
+          if (!group || !group.labelSegment) return;
+
+          const newPreset: SectionPreset = {
+              id: uuidv4(),
+              name: name,
+              data: [group.labelSegment, ...group.contentSegments]
+          };
+
+          setSectionPresets(prev => [...prev, newPreset]);
+          setIsSaveSectionModalOpen(false);
+          setSavingSectionId(null);
+          showNotification("Section Saved to Library");
+      }
+  };
+  
+  const executeSectionOverwrite = () => {
+      if (!overwriteTarget || !savingSectionId) return;
+
       const group = groupSegments(segments).find(g => g.labelSegment?.id === savingSectionId);
       if (!group || !group.labelSegment) return;
 
-      const newPreset: SectionPreset = {
-          id: uuidv4(),
-          name: presetNameInput.trim(),
-          data: [group.labelSegment, ...group.contentSegments]
-      };
+      setSectionPresets(prev => prev.map(p => {
+          if (p.id === overwriteTarget.id) {
+              return {
+                  ...p,
+                  data: [group.labelSegment!, ...group.contentSegments],
+              };
+          }
+          return p;
+      }));
 
-      setSectionPresets(prev => [...prev, newPreset]);
-      setIsSaveSectionModalOpen(false);
+      setOverwriteTarget(null);
       setSavingSectionId(null);
-      showNotification("Section Saved to Library");
+      showNotification("Section Overwritten");
   };
 
   const handleInsertSectionPreset = (preset: SectionPreset) => {
@@ -1269,16 +1304,47 @@ export default function App() {
                        }
                    }
                    
-                   const preSeg = { ...seg, content: pre };
-                   const postSeg = { id: uuidv4(), type: 'text' as SegmentType, content: post };
-                   
                    let newSegments = [...segments];
                    if (pastedSegments) {
+                       const preSeg = { ...seg, content: pre };
+                       const postSeg = { id: uuidv4(), type: 'text' as SegmentType, content: post };
                        newSegments.splice(index, 1, preSeg, ...pastedSegments, postSeg);
                    } else {
-                       // Plain text paste
-                       const newContent = pre + text + post;
-                       newSegments[index] = {...seg, content: newContent};
+                       // Plain text paste logic: Split by lines to ensure empty lines create separate segments
+                       const lines = text.split(/\r\n|\r|\n/);
+                       
+                       // If we only have one line (and no internal newlines), proceed simply
+                       if (lines.length === 1) {
+                            const newContent = pre + text + post;
+                            newSegments[index] = {...seg, content: newContent};
+                       } else {
+                            // Multi-line paste: create separate segments for structure
+                            const segmentsToInsert: Segment[] = [];
+                            lines.forEach((line, i) => {
+                                const isLastLine = i === lines.length - 1;
+                                let lineContent = line;
+                                
+                                // All lines except the last must end with \n to maintain flow
+                                if (!isLastLine) {
+                                    lineContent += '\n';
+                                }
+                                
+                                // First line merges with 'pre' part of existing segment
+                                if (i === 0) {
+                                    lineContent = pre + lineContent;
+                                }
+                                
+                                // Last line merges with 'post' part of existing segment
+                                if (isLastLine) {
+                                    lineContent = lineContent + post;
+                                }
+                                
+                                segmentsToInsert.push({ id: uuidv4(), type: 'text', content: lineContent });
+                            });
+                            
+                            // Replace the original segment with these new structured segments
+                            newSegments.splice(index, 1, ...segmentsToInsert);
+                       }
                    }
                    updateSegments(newSegments);
                    return;
@@ -1288,7 +1354,17 @@ export default function App() {
                   if (pastedSegments) {
                       newSegments.splice(index + 1, 0, ...pastedSegments);
                   } else {
-                      newSegments.splice(index + 1, 0, { id: uuidv4(), type: 'text', content: text });
+                      // If inserting plain text after a block, also handle multiline split if needed
+                       const lines = text.split(/\r\n|\r|\n/);
+                       const segmentsToInsert = lines.map((line, i) => {
+                           const isLastLine = i === lines.length - 1;
+                           return {
+                               id: uuidv4(),
+                               type: 'text' as SegmentType,
+                               content: isLastLine ? line : (line + '\n')
+                           };
+                       });
+                      newSegments.splice(index + 1, 0, ...segmentsToInsert);
                   }
                   updateSegments(newSegments);
                   return;
@@ -1300,7 +1376,7 @@ export default function App() {
       if (pastedSegments) {
           updateSegments([...segments, ...pastedSegments]);
       } else {
-          // Append
+          // Append plain text
           updateSegments([...segments, { id: uuidv4(), type: 'text', content: text }]);
       }
   };
@@ -1866,7 +1942,7 @@ export default function App() {
                                             : 'border-transparent hover:border-canvas-700 bg-canvas-800/30 hover:bg-canvas-800'
                                         }`}
                                 >
-                                    <span className={`text-xs font-bold truncate ${selectedLibraryOptionId === preset.id ? 'text-brand-200' : 'text-canvas-300 group-hover:text-white'}`}>
+                                    <span className="text-xs font-bold truncate text-canvas-300 group-hover:text-white">
                                         {preset.name}
                                     </span>
                                     {selectedLibraryOptionId === preset.id && <div className="w-1.5 h-1.5 rounded-full bg-brand-500"></div>}
@@ -1941,15 +2017,15 @@ export default function App() {
                      </div>
                      
                      <div 
-                         className={`p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 ${savedProjects.length > 0 ? 'pb-32' : ''}`}
+                         className={`p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 flex flex-col ${savedProjects.length > 0 ? 'pb-32' : ''}`}
                          onClick={() => setSelectedSidebarProjectId(null)} // Click empty space to deselect
                      >
-                         {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-canvas-600 space-y-3 text-center p-4"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
+                         {savedProjects.length === 0 && <div className="flex-1 flex flex-col items-center justify-center min-h-[200px] text-canvas-600 space-y-3 text-center p-4"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
                          {savedProjects.map(p => (
                             <div 
                                 key={p.id} 
                                 onClick={(e) => { e.stopPropagation(); setSelectedSidebarProjectId(p.id === selectedSidebarProjectId ? null : p.id); }}
-                                className={`group border rounded-md p-3 cursor-pointer transition-all relative z-20 backdrop-blur-sm
+                                className={`group border rounded-md p-3 cursor-pointer transition-all relative z-20 backdrop-blur-sm shrink-0
                                     ${selectedSidebarProjectId === p.id
                                         ? 'bg-brand-900/40 border-brand-500/50'
                                         : 'bg-canvas-900/40 border-canvas-800/50 hover:bg-canvas-800 hover:border-canvas-700'
@@ -2062,6 +2138,30 @@ export default function App() {
                 <div className="flex justify-end gap-2 pt-2">
                    <button onClick={() => setDeleteTarget(null)} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
                    <button onClick={executeDelete} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-bold shadow-lg shadow-red-500/20">Delete Forever</button>
+                </div>
+            </div>
+        </Modal>
+      )}
+
+      {/* Overwrite Confirmation Modal (For Sections) */}
+      {overwriteTarget && (
+        <Modal isOpen={!!overwriteTarget} onClose={() => { setOverwriteTarget(null); setSavingSectionId(null); }} title="Confirm Overwrite">
+            <div className="space-y-4 font-sans" onClick={e => e.stopPropagation()}>
+                <div className="bg-amber-900/20 p-3 rounded border border-amber-500/30 flex items-center gap-3">
+                   <Save className="text-amber-400" size={18} />
+                   <div className="space-y-1">
+                       <p className="text-xs text-amber-200 font-bold uppercase tracking-wide">Duplicate Found</p>
+                       <p className="text-xs text-amber-200/80">
+                           A section named <strong className="text-white">"{overwriteTarget.name}"</strong> already exists in your library.
+                       </p>
+                   </div>
+                </div>
+                <p className="text-xs text-canvas-400 text-center">
+                    Do you want to overwrite the existing section with this new version?
+                </p>
+                <div className="flex justify-end gap-2 pt-2">
+                   <button onClick={() => { setOverwriteTarget(null); setSavingSectionId(null); }} className="px-3 py-2 text-xs font-bold text-canvas-400 hover:text-white">Cancel</button>
+                   <button onClick={executeSectionOverwrite} className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-bold shadow-lg shadow-amber-500/20">Overwrite</button>
                 </div>
             </div>
         </Modal>
