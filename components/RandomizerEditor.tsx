@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Sliders, Edit3, Copy, Check, X as XIcon, CheckSquare, Square, Sparkles, Wand2 } from './Icons';
-import { generateCreativeOptions } from '../services/ai';
+import { Plus, Trash2, Sliders, Edit3, Copy, Check, X as XIcon, CheckSquare, Square, Sparkles } from './Icons';
+import { generateVariations } from '../services/ai';
 
 interface RandomizerEditorProps {
   options: string[];
@@ -24,18 +23,12 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   });
 
   const [newItem, setNewItem] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // Inline Editing State
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
-
-  // AI State
-  const [isAiMode, setIsAiMode] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiCount, setAiCount] = useState(5);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingIndex !== null && editInputRef.current) {
@@ -61,43 +54,33 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
     }
   };
 
-  const handleAiGenerate = async () => {
-      if (!aiPrompt.trim()) return;
-      
-      // Check and request API Key if needed
-      if (typeof window !== 'undefined' && (window as any).aistudio) {
-        const aistudio = (window as any).aistudio;
-        try {
-            const hasKey = await aistudio.hasSelectedApiKey();
-            if (!hasKey) {
-                await aistudio.openSelectKey();
-            }
-        } catch (e) {
-            console.error("API Key selection error:", e);
+  const handleMagic = async () => {
+    // Determine context: Use input box if available, otherwise use existing items as context
+    const context = newItem.trim();
+    if (!context && items.length === 0) return;
+    
+    setIsGenerating(true);
+    try {
+        const existing = items.map(i => i.text);
+        const contextString = context || existing.join(', ');
+        
+        const newOptions = await generateVariations(existing, contextString);
+        
+        if (newOptions && newOptions.length > 0) {
+            const addedItems = newOptions.map(text => ({ text, enabled: true }));
+            const updated = [...items, ...addedItems];
+            setItems(updated);
+            triggerSave(updated);
+            if (context) setNewItem(''); // Clear input if it was used as the primary context
         }
-      }
-      
-      setIsAiLoading(true);
-      setAiError(null);
-      
-      const currentContext = items.map(i => i.text);
-      const result = await generateCreativeOptions(aiPrompt, aiCount, currentContext);
-      
-      if (result.error) {
-          setAiError(result.error);
-          // If the error suggests key issues, offer a retry link
-          if (result.error.toLowerCase().includes("api key") && typeof window !== 'undefined' && (window as any).aistudio) {
-               // Optional: Trigger select again on next click or provide UI hint
-          }
-      } else if (result.options.length > 0) {
-          const newItems = result.options.map(opt => ({ text: opt, enabled: true }));
-          const updated = [...items, ...newItems];
-          setItems(updated);
-          triggerSave(updated);
-          setAiPrompt(''); // Clear prompt on success
-      }
-      
-      setIsAiLoading(false);
+    } catch (e) {
+        console.error(e);
+        const msg = e instanceof Error ? e.message : "Generation failed";
+        // Simple alert for error feedback in this context
+        alert(msg);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   const handleRemove = (index: number) => {
@@ -153,6 +136,7 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   };
 
   const isAllEnabled = items.length > 0 && items.every(i => i.enabled);
+  const isSomeEnabled = items.some(i => i.enabled);
 
   return (
     <div className="space-y-4 font-sans">
@@ -163,109 +147,49 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
             Manage variations. Uncheck to disable.
             </p>
         </div>
-        <div className="flex items-center gap-2">
+        {items.length > 0 && (
             <button 
-                onClick={() => setIsAiMode(!isAiMode)} 
-                className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors ${isAiMode ? 'bg-purple-500/20 text-purple-300 ring-1 ring-purple-500/50' : 'text-canvas-400 hover:text-purple-300 hover:bg-white/5'}`}
-                title="AI Magic Expand"
+                onClick={toggleAll} 
+                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
             >
-                <Sparkles size={14} className={isAiMode ? "text-purple-400" : ""} />
-                Magic
+                {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
+                {isAllEnabled ? 'All On' : 'Toggle'}
             </button>
-            {items.length > 0 && (
-                <button 
-                    onClick={toggleAll} 
-                    className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
-                >
-                    {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
-                    {isAllEnabled ? 'All On' : 'Toggle'}
-                </button>
-            )}
-        </div>
+        )}
       </div>
 
-      {/* AI Expansion Area */}
-      {isAiMode && (
-          <div className="animate-in slide-in-from-top-2 duration-200">
-            <div className="bg-purple-900/10 border border-purple-500/30 rounded-lg p-3 space-y-2">
-                <div className="flex items-center gap-2 mb-1">
-                    <Wand2 size={14} className="text-purple-400" />
-                    <span className="text-xs font-bold text-purple-200 uppercase tracking-wider">Magic Expand</span>
-                </div>
-                <div className="flex gap-2">
-                    <div className="relative w-16 shrink-0" title="Number of options to generate">
-                        <input 
-                            type="number"
-                            min="1"
-                            max="20"
-                            value={aiCount}
-                            onChange={(e) => setAiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
-                            className="w-full bg-canvas-950 border border-purple-500/30 focus:border-purple-500 rounded pl-8 pr-1 py-2 text-sm text-white focus:outline-none"
-                        />
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] text-purple-400/50 font-bold pointer-events-none">QTY</span>
-                    </div>
-                    <input 
-                        type="text" 
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAiGenerate()}
-                        placeholder="e.g. 'sci-fi metals', 'moody colors'"
-                        className="flex-1 bg-canvas-950 border border-purple-500/30 focus:border-purple-500 rounded px-3 py-2 text-sm text-white placeholder:text-purple-300/30 focus:outline-none"
-                        autoFocus
-                    />
-                    <button 
-                        onClick={handleAiGenerate}
-                        disabled={isAiLoading || !aiPrompt.trim()}
-                        className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded font-bold text-xs transition-colors flex items-center gap-2 min-w-[80px] justify-center"
-                    >
-                        {isAiLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : 'Generate'}
-                    </button>
-                </div>
-                {aiError && (
-                    <p className="text-[10px] text-red-400 px-1">{aiError}</p>
-                )}
-                <p className="text-[10px] text-purple-300/50 px-1 italic">
-                    Tip: Describe what you want, and AI will generate exactly {aiCount} options.
-                </p>
-                {aiError && aiError.toLowerCase().includes("api key") && (
-                     <button 
-                        onClick={() => typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey()} 
-                        className="text-[10px] text-brand-400 underline hover:text-brand-300 block mt-1"
-                     >
-                        Configure API Key
-                     </button>
-                )}
-            </div>
-          </div>
-      )}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+          placeholder="New option or theme for AI..."
+          className="flex-1 bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 transition-colors placeholder:text-canvas-600"
+          autoFocus={editingIndex === null}
+        />
+        <button
+          onClick={handleMagic}
+          disabled={isGenerating || (!newItem.trim() && items.length === 0)}
+          className={`bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded transition-all flex items-center justify-center ${isGenerating ? 'animate-pulse' : ''}`}
+          title="Magic: Generate options with AI"
+        >
+          <Sparkles size={18} className={isGenerating ? 'animate-spin' : ''} />
+        </button>
+        <button
+          onClick={handleAdd}
+          disabled={!newItem.trim()}
+          className="bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded transition-all"
+          title="Add Option"
+        >
+          <Plus size={18} />
+        </button>
+      </div>
 
-      {/* Manual Input */}
-      {!isAiMode && (
-        <div className="flex gap-2">
-            <input
-            type="text"
-            value={newItem}
-            onChange={(e) => setNewItem(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            placeholder="Add option manually..."
-            className="flex-1 bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 transition-colors placeholder:text-canvas-600"
-            autoFocus={editingIndex === null}
-            />
-            <button
-            onClick={handleAdd}
-            disabled={!newItem.trim()}
-            className="bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded transition-all"
-            >
-            <Plus size={18} />
-            </button>
-        </div>
-      )}
-
-      {/* List */}
       <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
         {items.length === 0 && (
           <div className="text-center py-6 text-canvas-600 text-xs italic border border-dashed border-canvas-800 rounded">
-            No options defined. Use Magic Expand or add manually.
+            No options defined. Enter a theme and click <Sparkles size={10} className="inline text-purple-400"/> to generate.
           </div>
         )}
         {items.map((item, idx) => (
