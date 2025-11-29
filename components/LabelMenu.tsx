@@ -71,19 +71,38 @@ export const LabelMenu: React.FC<LabelMenuProps> = ({
   useLayoutEffect(() => {
     if (isOpen && anchorRef.current) {
         const rect = anchorRef.current.getBoundingClientRect();
-        const MENU_WIDTH = 320; // Increased width (w-80)
-        let top = rect.top;
-        let left = rect.right + 8;
+        const MENU_WIDTH = 320; // w-80
+        const GAP = 8;
+        const SCREEN_MARGIN = 16;
         
-        // Horizontal flip if not enough space
-        if (left + MENU_WIDTH > window.innerWidth) left = rect.left - MENU_WIDTH - 8;
+        let top = rect.top;
+        let left: number;
+        
+        // Define vertical mode based on common mobile/tablet breakpoint (lg = 1024px)
+        const isVerticalMode = window.innerWidth < 1024;
+
+        if (isVerticalMode) {
+            // Vertical Mode: Force align to right edge of screen
+            left = window.innerWidth - MENU_WIDTH - SCREEN_MARGIN;
+        } else {
+            // Desktop Mode: Try placement to the right of the anchor
+            left = rect.right + GAP;
+            // If it overflows right edge, flip to left of anchor
+            if (left + MENU_WIDTH > window.innerWidth) {
+                left = rect.left - MENU_WIDTH - GAP;
+            }
+        }
         
         // Vertical positioning (Smart clamping)
-        // We assume the menu is roughly 400px high max now that we removed scroll
-        const MENU_EST_HEIGHT = 420;
+        // Estimate height (w/o scroll) ~440px
+        const MENU_EST_HEIGHT = 440;
+        
         if (top + MENU_EST_HEIGHT > window.innerHeight) {
-            top = Math.max(10, window.innerHeight - MENU_EST_HEIGHT - 20);
+            top = window.innerHeight - MENU_EST_HEIGHT - SCREEN_MARGIN;
         }
+        
+        // Ensure strictly positive top
+        top = Math.max(SCREEN_MARGIN, top);
         
         setPosition({ top, left });
     }
