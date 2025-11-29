@@ -1944,7 +1944,7 @@ export default function App() {
                          className={`p-2 space-y-1 lg:flex-1 lg:overflow-y-auto custom-scrollbar relative z-10 ${savedProjects.length > 0 ? 'pb-32' : ''}`}
                          onClick={() => setSelectedSidebarProjectId(null)} // Click empty space to deselect
                      >
-                         {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full text-canvas-600 space-y-3 text-center p-4 mt-10"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
+                         {savedProjects.length === 0 && <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-canvas-600 space-y-3 text-center p-4"><Package size={32} className="opacity-20"/><p className="text-xs">No projects saved.</p></div>}
                          {savedProjects.map(p => (
                             <div 
                                 key={p.id} 
