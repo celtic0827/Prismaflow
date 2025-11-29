@@ -1,5 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Sliders, Edit3, Copy, Check, X as XIcon, CheckSquare, Square } from './Icons';
+import { Plus, Trash2, Sliders, Edit3, Copy, Check, X as XIcon, CheckSquare, Square, Sparkles, Wand2 } from './Icons';
+import { generateCreativeOptions } from '../services/ai';
 
 interface RandomizerEditorProps {
   options: string[];
@@ -28,6 +30,13 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   const [editValue, setEditValue] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  // AI State
+  const [isAiMode, setIsAiMode] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiCount, setAiCount] = useState(5);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   useEffect(() => {
     if (editingIndex !== null && editInputRef.current) {
         editInputRef.current.focus();
@@ -50,6 +59,29 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
       setNewItem('');
       triggerSave(updated);
     }
+  };
+
+  const handleAiGenerate = async () => {
+      if (!aiPrompt.trim()) return;
+      
+      setIsAiLoading(true);
+      setAiError(null);
+      
+      const currentContext = items.map(i => i.text);
+      const result = await generateCreativeOptions(aiPrompt, aiCount, currentContext);
+      
+      if (result.error) {
+          setAiError(result.error);
+      } else if (result.options.length > 0) {
+          const newItems = result.options.map(opt => ({ text: opt, enabled: true }));
+          const updated = [...items, ...newItems];
+          setItems(updated);
+          triggerSave(updated);
+          setAiPrompt(''); // Clear prompt on success
+          // Optional: Keep AI mode open for more generation, or close it. Keeping it open is usually better flow.
+      }
+      
+      setIsAiLoading(false);
   };
 
   const handleRemove = (index: number) => {
@@ -105,7 +137,6 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   };
 
   const isAllEnabled = items.length > 0 && items.every(i => i.enabled);
-  const isSomeEnabled = items.some(i => i.enabled);
 
   return (
     <div className="space-y-4 font-sans">
@@ -116,40 +147,101 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
             Manage variations. Uncheck to disable.
             </p>
         </div>
-        {items.length > 0 && (
+        <div className="flex items-center gap-2">
             <button 
-                onClick={toggleAll} 
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                onClick={() => setIsAiMode(!isAiMode)} 
+                className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors ${isAiMode ? 'bg-purple-500/20 text-purple-300 ring-1 ring-purple-500/50' : 'text-canvas-400 hover:text-purple-300 hover:bg-white/5'}`}
+                title="AI Magic Expand"
             >
-                {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
-                {isAllEnabled ? 'All On' : 'Toggle'}
+                <Sparkles size={14} className={isAiMode ? "text-purple-400" : ""} />
+                Magic
             </button>
-        )}
+            {items.length > 0 && (
+                <button 
+                    onClick={toggleAll} 
+                    className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                >
+                    {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
+                    {isAllEnabled ? 'All On' : 'Toggle'}
+                </button>
+            )}
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={newItem}
-          onChange={(e) => setNewItem(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder="New option..."
-          className="flex-1 bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 transition-colors placeholder:text-canvas-600"
-          autoFocus={editingIndex === null}
-        />
-        <button
-          onClick={handleAdd}
-          disabled={!newItem.trim()}
-          className="bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded transition-all"
-        >
-          <Plus size={18} />
-        </button>
-      </div>
+      {/* AI Expansion Area */}
+      {isAiMode && (
+          <div className="animate-in slide-in-from-top-2 duration-200">
+            <div className="bg-purple-900/10 border border-purple-500/30 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                    <Wand2 size={14} className="text-purple-400" />
+                    <span className="text-xs font-bold text-purple-200 uppercase tracking-wider">Magic Expand</span>
+                </div>
+                <div className="flex gap-2">
+                    <div className="relative w-16 shrink-0" title="Number of options to generate">
+                        <input 
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={aiCount}
+                            onChange={(e) => setAiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                            className="w-full bg-canvas-950 border border-purple-500/30 focus:border-purple-500 rounded pl-8 pr-1 py-2 text-sm text-white focus:outline-none"
+                        />
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] text-purple-400/50 font-bold pointer-events-none">QTY</span>
+                    </div>
+                    <input 
+                        type="text" 
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAiGenerate()}
+                        placeholder="e.g. 'sci-fi metals', 'moody colors'"
+                        className="flex-1 bg-canvas-950 border border-purple-500/30 focus:border-purple-500 rounded px-3 py-2 text-sm text-white placeholder:text-purple-300/30 focus:outline-none"
+                        autoFocus
+                    />
+                    <button 
+                        onClick={handleAiGenerate}
+                        disabled={isAiLoading || !aiPrompt.trim()}
+                        className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded font-bold text-xs transition-colors flex items-center gap-2 min-w-[80px] justify-center"
+                    >
+                        {isAiLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : 'Generate'}
+                    </button>
+                </div>
+                {aiError && (
+                    <p className="text-[10px] text-red-400 px-1">{aiError}</p>
+                )}
+                <p className="text-[10px] text-purple-300/50 px-1 italic">
+                    Tip: Describe what you want, and AI will generate exactly {aiCount} options.
+                </p>
+            </div>
+          </div>
+      )}
 
+      {/* Manual Input */}
+      {!isAiMode && (
+        <div className="flex gap-2">
+            <input
+            type="text"
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            placeholder="Add option manually..."
+            className="flex-1 bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 transition-colors placeholder:text-canvas-600"
+            autoFocus={editingIndex === null}
+            />
+            <button
+            onClick={handleAdd}
+            disabled={!newItem.trim()}
+            className="bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded transition-all"
+            >
+            <Plus size={18} />
+            </button>
+        </div>
+      )}
+
+      {/* List */}
       <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
         {items.length === 0 && (
           <div className="text-center py-6 text-canvas-600 text-xs italic border border-dashed border-canvas-800 rounded">
-            No options defined.
+            No options defined. Use Magic Expand or add manually.
           </div>
         )}
         {items.map((item, idx) => (
