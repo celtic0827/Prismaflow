@@ -86,7 +86,7 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
       if (result.error) {
           setAiError(result.error);
           // If the error suggests key issues, offer a retry link
-          if (result.error.includes("API Key") && typeof window !== 'undefined' && (window as any).aistudio) {
+          if (result.error.toLowerCase().includes("api key") && typeof window !== 'undefined' && (window as any).aistudio) {
                // Optional: Trigger select again on next click or provide UI hint
           }
       } else if (result.options.length > 0) {
@@ -227,7 +227,7 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
                 <p className="text-[10px] text-purple-300/50 px-1 italic">
                     Tip: Describe what you want, and AI will generate exactly {aiCount} options.
                 </p>
-                {aiError && aiError.includes("API Key") && (
+                {aiError && aiError.toLowerCase().includes("api key") && (
                      <button 
                         onClick={() => typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey()} 
                         className="text-[10px] text-brand-400 underline hover:text-brand-300 block mt-1"

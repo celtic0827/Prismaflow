@@ -7,15 +7,11 @@ export interface GenerateOptionsResult {
 }
 
 export async function generateCreativeOptions(userPrompt: string, count: number = 5, currentContext: string[] = []): Promise<GenerateOptionsResult> {
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
-    return { options: [], error: "API Key not configured." };
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
   try {
+    // Initialize client inside try block to handle potential process.env access errors gracefully
+    // and rely on SDK's own validation for the key.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
     // Construct a prompt that includes the user's request and potentially some context
     let fullPrompt = `User Request: "${userPrompt}"\n`;
     
@@ -44,7 +40,6 @@ export async function generateCreativeOptions(userPrompt: string, count: number 
       }
     });
 
-    // Access the text property directly (it is a getter, not a function)
     const responseText = response.text;
     
     if (!responseText) {
