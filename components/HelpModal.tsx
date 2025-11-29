@@ -89,13 +89,13 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             <div className="flex gap-3">
               <div className="bg-canvas-800 p-2 rounded h-fit text-sky-400"><Save size={18}/></div>
               <div>
-                <h4 className="text-white font-bold text-xs mb-1">Local Storage Only</h4>
+                <h4 className="text-white font-bold text-xs mb-1">Local Storage & Backup</h4>
                 <p className="text-xs text-canvas-400 mb-2">
-                  All data is stored in your browser's local storage. We do not sync to the cloud.
-                  <strong className="text-red-400 block mt-1">Clearing browser cache will delete your projects.</strong>
+                  All data is stored locally in your browser. 
+                  <strong className="text-red-400 block mt-1">Clearing browser cache will permanently delete your projects.</strong>
                 </p>
                 <p className="text-xs text-canvas-400">
-                  Regularly use the <strong>Export Backup</strong> button in the toolbar to save a <code className="bg-canvas-900 px-1 rounded">.json</code> file of your work.
+                  To transfer data or ensure safety, use the <strong>Export Backup</strong> (Download icon) button in the toolbar to save a file, and <strong>Import Backup</strong> (Upload icon) to restore it.
                 </p>
               </div>
             </div>

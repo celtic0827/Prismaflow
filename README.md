@@ -1,7 +1,12 @@
 
 # Prismaflow: Modular Prompt Studio
 
-![Prismaflow Interface](https://upload.cc/i1/2025/11/29/u8BHLO.jpg)
+<p align="center">
+  <img src="https://upload.cc/i1/2025/11/29/u8BHLO.jpg" alt="Prismaflow Desktop Interface" width="100%">
+</p>
+<p align="center">
+  <img src="https://upload.cc/i1/2025/11/29/FEMZOT.png" alt="Prismaflow Mobile Interface" width="50%">
+</p>
 
 [**Live Demo**](https://prismaflow-sigma.vercel.app/)
 
@@ -27,13 +32,20 @@
 
 ---
 
-## 💾 Data Storage & Backup
+## 💾 Data Storage & Safety
 
-**Important:** Prismaflow operates entirely within your browser (Client-Side).
+**⚠️ Important:** Prismaflow is a **Local-Only** application.
 
-*   **Local Storage:** All your projects and settings are stored locally in your browser. No data is sent to any external server, ensuring complete privacy.
-*   **Data Safety:** **Clearing your browser cache or site data will permanently delete your saved projects.**
-*   **Backup & Transfer:** To keep your data safe or move it to another device, regularly use the **Export Backup** feature (Download icon) in the toolbar. This saves your entire workspace as a `.json` file. You can restore it anytime using **Import Backup** (Upload icon).
+1.  **Local Storage:** 
+    All projects, presets, and settings are saved directly in your browser's Local Storage. We do not store your data on any external server.
+
+2.  **Data Permanence:** 
+    **Clearing your browser cache or "Site Data" will permanently delete your saved projects.**
+
+3.  **Backup & Transfer:**
+    To prevent data loss or to move your projects to another device, you must manually export your data.
+    *   **Export:** Click the **Download** icon in the toolbar to save a `.json` backup file of your entire workspace.
+    *   **Import:** Click the **Upload** icon to restore your backup on any device or browser.
 
 ---
 
