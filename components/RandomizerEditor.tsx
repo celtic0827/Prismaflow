@@ -55,32 +55,30 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   };
 
   const handleMagic = async () => {
-    // Determine context: Use input box if available, otherwise use existing items as context
-    const context = newItem.trim();
-    if (!context && items.length === 0) return;
-    
-    setIsGenerating(true);
-    try {
-        const existing = items.map(i => i.text);
-        const contextString = context || existing.join(', ');
-        
-        const newOptions = await generateVariations(existing, contextString);
-        
-        if (newOptions && newOptions.length > 0) {
-            const addedItems = newOptions.map(text => ({ text, enabled: true }));
-            const updated = [...items, ...addedItems];
-            setItems(updated);
-            triggerSave(updated);
-            if (context) setNewItem(''); // Clear input if it was used as the primary context
-        }
-    } catch (e) {
-        console.error(e);
-        const msg = e instanceof Error ? e.message : "Generation failed";
-        // Simple alert for error feedback in this context
-        alert(msg);
-    } finally {
-        setIsGenerating(false);
-    }
+      setIsGenerating(true);
+      try {
+          const currentOptions = items.map(i => i.text).filter(t => t.trim());
+          // Use current options or the input field as context
+          const contextSeed = currentOptions.length > 0 ? currentOptions.join(', ') : newItem;
+          
+          const newVariations = await generateVariations(currentOptions, contextSeed || "creative concepts");
+          
+          if (newVariations && newVariations.length > 0) {
+              const existingTexts = new Set(items.map(i => i.text.toLowerCase()));
+              const uniqueNew = newVariations.filter(v => !existingTexts.has(v.toLowerCase()));
+              
+              if (uniqueNew.length > 0) {
+                  const newItems = uniqueNew.map(text => ({ text, enabled: true }));
+                  const updated = [...items, ...newItems];
+                  setItems(updated);
+                  triggerSave(updated);
+              }
+          }
+      } catch (e) {
+          console.error("Magic generation failed", e);
+      } finally {
+          setIsGenerating(false);
+      }
   };
 
   const handleRemove = (index: number) => {
@@ -136,7 +134,6 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
   };
 
   const isAllEnabled = items.length > 0 && items.every(i => i.enabled);
-  const isSomeEnabled = items.some(i => i.enabled);
 
   return (
     <div className="space-y-4 font-sans">
@@ -147,15 +144,25 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
             Manage variations. Uncheck to disable.
             </p>
         </div>
-        {items.length > 0 && (
+        <div className="flex items-center gap-2">
             <button 
-                onClick={toggleAll} 
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                onClick={handleMagic}
+                disabled={isGenerating}
+                className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors ${isGenerating ? 'text-brand-400 bg-brand-900/40' : 'text-purple-400 hover:text-white hover:bg-white/5'}`}
             >
-                {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
-                {isAllEnabled ? 'All On' : 'Toggle'}
+                <Sparkles size={14} className={isGenerating ? "animate-spin" : ""}/>
+                {isGenerating ? 'Dreaming...' : 'Magic'}
             </button>
-        )}
+            {items.length > 0 && (
+                <button 
+                    onClick={toggleAll} 
+                    className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-canvas-400 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                >
+                    {isAllEnabled ? <CheckSquare size={14} className="text-brand-400"/> : <Square size={14}/>}
+                    {isAllEnabled ? 'All On' : 'Toggle'}
+                </button>
+            )}
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -164,18 +171,10 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder="New option or theme for AI..."
+          placeholder="New option..."
           className="flex-1 bg-canvas-950 border border-canvas-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 transition-colors placeholder:text-canvas-600"
           autoFocus={editingIndex === null}
         />
-        <button
-          onClick={handleMagic}
-          disabled={isGenerating || (!newItem.trim() && items.length === 0)}
-          className={`bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded transition-all flex items-center justify-center ${isGenerating ? 'animate-pulse' : ''}`}
-          title="Magic: Generate options with AI"
-        >
-          <Sparkles size={18} className={isGenerating ? 'animate-spin' : ''} />
-        </button>
         <button
           onClick={handleAdd}
           disabled={!newItem.trim()}
@@ -189,7 +188,7 @@ export const RandomizerEditor: React.FC<RandomizerEditorProps> = ({ options, dis
       <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
         {items.length === 0 && (
           <div className="text-center py-6 text-canvas-600 text-xs italic border border-dashed border-canvas-800 rounded">
-            No options defined. Enter a theme and click <Sparkles size={10} className="inline text-purple-400"/> to generate.
+            No options defined. Enter text above or try <strong className="text-purple-400">Magic</strong>.
           </div>
         )}
         {items.map((item, idx) => (

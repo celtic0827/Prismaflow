@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { 
   Layers, Zap, Trash2, Save, HelpCircle, Edit3, Type, Tag,
   FolderPlus, LayoutTemplate,
-  LABEL_ICONS // Import label icon map
+  LABEL_ICONS, // Import label icon map
+  Upload
 } from './components/Icons';
 import { Segment, SelectionState, SavedProject, SegmentType, OptionPreset, SectionPreset } from './types';
 import { normalizeSegments, getRandom, copyToClipboard, groupSegments } from './utils';
@@ -126,6 +127,9 @@ export default function App() {
   const [optionPresets, setOptionPresets] = useState<OptionPreset[]>(loadOptionPresets);
   const [sectionPresets, setSectionPresets] = useState<SectionPreset[]>(loadSectionPresets);
   const [notification, setNotification] = useState<string | null>(null);
+  
+  // Drag and Drop State
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const [history, setHistory] = useState<Segment[][]>(() => [initialState.segments]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -271,6 +275,44 @@ export default function App() {
   useEffect(() => {
       localStorage.setItem(SECTION_PRESETS_KEY, JSON.stringify(sectionPresets));
   }, [sectionPresets]);
+
+  // Drag and Drop Global Listeners
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDraggingFile) setIsDraggingFile(true);
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.relatedTarget === null) {
+            setIsDraggingFile(false);
+        }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDraggingFile(false);
+
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            processImportedFile(files[0]);
+        }
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+        window.removeEventListener('dragover', handleDragOver);
+        window.removeEventListener('dragleave', handleDragLeave);
+        window.removeEventListener('drop', handleDrop);
+    };
+  }, [isDraggingFile]);
 
   useLayoutEffect(() => {
     if (!focusRequest) return;
@@ -1154,10 +1196,7 @@ export default function App() {
       showNotification("Backup Exported");
   };
 
-  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
+  const processImportedFile = (file: File) => {
       const reader = new FileReader();
       reader.onload = (e) => {
           try {
@@ -1214,9 +1253,15 @@ export default function App() {
               console.error(err);
               showNotification("Failed to parse backup file");
           }
-          if (backupFileInputRef.current) backupFileInputRef.current.value = '';
       };
       reader.readAsText(file);
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      processImportedFile(file);
+      if (backupFileInputRef.current) backupFileInputRef.current.value = '';
   };
   
   const handleImportCSV = (e: any) => {};
@@ -1274,10 +1319,23 @@ export default function App() {
   if (!segments) return <div className="min-h-screen bg-canvas-950 flex items-center justify-center text-canvas-500 font-mono">Loading Prismaflow...</div>;
 
   return (
-    <div className="min-h-screen bg-canvas-950 flex flex-col items-center py-10 px-4 md:px-8" onClick={handleGlobalClick}>
+    <div className="min-h-screen bg-canvas-950 flex flex-col items-center py-10 px-4 md:px-8 relative" onClick={handleGlobalClick}>
       <input type="file" ref={fileInputRef} onChange={handleImportCSV} className="hidden" />
       <input type="file" ref={backupFileInputRef} onChange={handleImportBackup} accept=".json" className="hidden" />
       
+      {/* Drag & Drop Overlay */}
+      {isDraggingFile && (
+          <div className="fixed inset-0 z-[100] bg-canvas-950/80 backdrop-blur-sm border-2 border-dashed border-brand-500 m-4 rounded-xl flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
+              <div className="flex flex-col items-center gap-4 p-8 bg-canvas-900 rounded-lg shadow-2xl border border-canvas-700">
+                  <Upload size={64} className="text-brand-400 animate-bounce" />
+                  <div className="text-center space-y-2">
+                      <h2 className="text-2xl font-bold text-white">Drop to Import Backup</h2>
+                      <p className="text-canvas-400 font-mono text-sm">Release the .json file to restore your projects.</p>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Notifications */}
       {notification && notification.trim() !== '' && (
       <div className={`fixed top-6 left-1/2 -translate-x-1/2 bg-canvas-800 border border-brand-500/50 text-brand-100 px-6 py-3 rounded-full shadow-lg z-50 transition-all opacity-100 translate-y-0`}>

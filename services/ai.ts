@@ -7,7 +7,6 @@ export async function generateVariations(
   
   // 1. Check for AI Studio Key Selection Environment
   // This handles the "API Key not configured" error by ensuring a key is selected in supported environments.
-  // Cast window to any to avoid TypeScript errors with conflicting global types for aistudio.
   const win = window as any;
 
   if (win.aistudio) {
@@ -21,36 +20,41 @@ export async function generateVariations(
     }
   }
 
-  // 2. Initialize Client
-  // Initialize INSIDE the function to ensure process.env is populated at runtime.
-  // Using process.env.API_KEY directly as required.
-  const apiKey = process.env.API_KEY;
-  
-  // If API key is still missing after the selection flow, we cannot proceed.
-  // We throw a specific error that the UI can catch.
-  if (!apiKey) {
-    throw new Error("API Key not configured. Please ensure you have selected a valid API key.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  // 3. Construct Prompt
-  const prompt = `
-    You are a creative assistant for a prompt engineering tool.
-    
-    Task: Generate 5 new, distinct options for a randomizer block.
-    Context/Input: "${context}"
-    Existing Options (Avoid Duplicates): ${existingOptions.join(', ')}
-    
-    Requirements:
-    - Return ONLY a raw JSON array of strings.
-    - Keep items concise (1-5 words).
-    - Match the tone of the input.
-    - Do not include the original context in the output.
-  `;
-
-  // 4. Call API
   try {
+    // 2. Initialize Client
+    // Safe access to API Key to avoid ReferenceErrors if process is undefined in certain build environments
+    let apiKey = '';
+    try {
+      if (typeof process !== 'undefined' && process.env) {
+        apiKey = process.env.API_KEY || '';
+      }
+    } catch (e) {
+      // Ignore reference errors
+    }
+    
+    // Explicitly check for API key if not in AI Studio (where it might be injected late)
+    if (!apiKey && !win.aistudio) {
+        throw new Error("API Key not found. If deployed, please set the API_KEY environment variable.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    // 3. Construct Prompt
+    const prompt = `
+      You are a creative assistant for a prompt engineering tool.
+      
+      Task: Generate 5 new, distinct options for a randomizer block.
+      Context/Input: "${context}"
+      Existing Options (Avoid Duplicates): ${existingOptions.join(', ')}
+      
+      Requirements:
+      - Return ONLY a raw JSON array of strings.
+      - Keep items concise (1-5 words).
+      - Match the tone of the input.
+      - Do not include the original context in the output.
+    `;
+
+    // 4. Call API
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
@@ -72,10 +76,12 @@ export async function generateVariations(
     console.error("Gemini API Error:", error);
     
     // 5. Handle Key Expiry/Auth Errors
-    // If the key is invalid, prompt the user to select again.
-    if (error.message?.includes("Requested entity was not found") || error.message?.includes("403")) {
+    const msg = error.message || '';
+    if (msg.includes("API Key") || msg.includes("403") || msg.includes("not found")) {
       if (win.aistudio) {
-         await win.aistudio.openSelectKey();
+         try {
+             await win.aistudio.openSelectKey();
+         } catch {}
          throw new Error("API Key refreshed. Please try again.");
       }
     }
