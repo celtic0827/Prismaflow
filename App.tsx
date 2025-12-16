@@ -313,6 +313,117 @@ export default function App() {
       updateSegments([...segments, ...(pastedSegments || [{ id: uuidv4(), type: 'text', content: text }])]);
   };
 
+  // --- Insert & Replace Logic for Library Items ---
+
+  const handleInsertPreset = (preset: OptionPreset) => {
+    const activeVal = preset.options.length > 0 ? preset.options[0] : '';
+    const newSeg: Segment = {
+        id: uuidv4(),
+        type: 'random',
+        content: [...preset.options],
+        activeValue: activeVal,
+        disabledIndices: []
+    };
+    
+    let newSegments = [...segments];
+
+    if (selectedOptionId) {
+        const index = newSegments.findIndex(s => s.id === selectedOptionId);
+        if (index !== -1) {
+            newSegments.splice(index + 1, 0, newSeg);
+            updateSegments(newSegments);
+            showNotification(`Inserted "${preset.name}"`);
+            return;
+        }
+    }
+
+    if (selection.startId) {
+        const index = newSegments.findIndex(s => s.id === selection.startId);
+        if (index !== -1) {
+            const seg = newSegments[index];
+            if (seg.type === 'text') {
+                const content = seg.content as string;
+                const offset = selection.startOffset;
+                
+                const pre = content.substring(0, offset);
+                const post = content.substring(offset);
+                
+                const preSeg = { ...seg, content: pre };
+                const postSeg = { id: uuidv4(), type: 'text' as SegmentType, content: post };
+                
+                newSegments.splice(index, 1, preSeg, newSeg, postSeg);
+            } else {
+                newSegments.splice(index + 1, 0, newSeg);
+            }
+            updateSegments(newSegments);
+            showNotification(`Inserted "${preset.name}"`);
+            return;
+        }
+    }
+
+    newSegments.push(newSeg);
+    updateSegments(newSegments);
+    showNotification(`Inserted "${preset.name}"`);
+  };
+
+  const handleReplacePreset = (preset: OptionPreset) => {
+      if (!selectedOptionId) return;
+      const index = segments.findIndex(s => s.id === selectedOptionId);
+      if (index === -1) return;
+
+      const activeVal = preset.options.length > 0 ? preset.options[0] : '';
+      const newSeg: Segment = {
+          ...segments[index],
+          content: [...preset.options],
+          activeValue: activeVal,
+          disabledIndices: [] 
+      };
+      
+      const newSegments = [...segments];
+      newSegments[index] = newSeg;
+      updateSegments(newSegments);
+      showNotification(`Replaced with "${preset.name}"`);
+  };
+
+  const handleInsertSection = (preset: SectionPreset) => {
+    const pastedSegments = preset.data.map(s => ({ ...s, id: uuidv4() }));
+
+    if (selection.startId) {
+        const index = segments.findIndex(s => s.id === selection.startId);
+        if (index !== -1) {
+            const seg = segments[index];
+            if (seg.type === 'text') {
+                const content = seg.content as string;
+                const offset = selection.startOffset;
+                let pre = content.substring(0, offset);
+                const post = content.substring(offset);
+
+                if (pre.length > 0 && !pre.endsWith('\n')) {
+                    pre += '\n';
+                }
+
+                const preSeg = { ...seg, content: pre };
+                const postSeg = { id: uuidv4(), type: 'text' as SegmentType, content: post };
+                
+                const newSegments = [...segments];
+                newSegments.splice(index, 1, preSeg, ...pastedSegments, postSeg);
+                updateSegments(newSegments);
+                showNotification(`Inserted Section "${preset.name}"`);
+                return;
+            } else {
+                const newSegments = [...segments];
+                newSegments.splice(index + 1, 0, ...pastedSegments);
+                updateSegments(newSegments);
+                showNotification(`Inserted Section "${preset.name}"`);
+                return;
+            }
+        }
+    }
+
+    updateSegments([...segments, ...pastedSegments]);
+    showNotification(`Inserted Section "${preset.name}"`);
+  };
+
   const handleAddLabel = () => {
     const color = LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)];
     const newLabel: Segment = { id: uuidv4(), type: 'label', content: '', color, icon: 'Tag' };
@@ -522,9 +633,15 @@ export default function App() {
           selectedLibraryOptionId={selectedLibraryOptionId} setSelectedLibraryOptionId={setSelectedLibraryOptionId} selectedSidebarProjectId={selectedSidebarProjectId} setSelectedSidebarProjectId={setSelectedSidebarProjectId}
           currentProjectId={currentProjectId} canSaveOption={!!selectedOptionId}
           onOpenSavePresetModal={() => { const s = segments.find(x => x.id === selectedOptionId); if(s) { setPresetNameInput(s.activeValue || 'New Preset'); setIsSavePresetModalOpen(true); } }}
-          onInsertPreset={(p) => { /* logic */ }} onReplacePreset={(p) => { /* logic */ }} onEditPreset={setEditingPresetId} onDeletePreset={(id) => setDeleteTarget({type:'option', id, name: optionPresets.find(x=>x.id===id)?.name||''})}
-          onInsertSection={(p) => { /* logic */ }} onDeleteSection={(id) => setDeleteTarget({type:'section', id, name: sectionPresets.find(x=>x.id===id)?.name||''})}
-          onLoadProject={handleLoadProject} onDuplicateProject={() => selectedSidebarProjectId && duplicateProject(selectedSidebarProjectId)} onDeleteProject={(id) => setDeleteTarget({type:'project', id, name: savedProjects.find(x=>x.id===id)?.name||''})}
+          onInsertPreset={handleInsertPreset} 
+          onReplacePreset={handleReplacePreset}
+          onEditPreset={setEditingPresetId} 
+          onDeletePreset={(id) => setDeleteTarget({type:'option', id, name: optionPresets.find(x=>x.id===id)?.name||''})}
+          onInsertSection={handleInsertSection} 
+          onDeleteSection={(id) => setDeleteTarget({type:'section', id, name: sectionPresets.find(x=>x.id===id)?.name||''})}
+          onLoadProject={handleLoadProject} 
+          onDuplicateProject={() => selectedSidebarProjectId && duplicateProject(selectedSidebarProjectId)} 
+          onDeleteProject={(id) => setDeleteTarget({type:'project', id, name: savedProjects.find(x=>x.id===id)?.name||''})}
         />
       </main>
 
