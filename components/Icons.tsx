@@ -62,7 +62,9 @@ import {
   Cpu,
   Globe,
   Music,
-  Video
+  Video,
+  AlertTriangle,
+  File
 } from 'lucide-react';
 
 // Map for dynamic lookup
@@ -149,5 +151,7 @@ export {
   Cpu,
   Globe,
   Music,
-  Video
+  Video,
+  AlertTriangle,
+  File
 };

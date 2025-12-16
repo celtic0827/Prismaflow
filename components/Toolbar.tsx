@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { 
   Undo2, Tag, Zap, ClipboardPaste, Save, FilePlus, 
-  Upload, Download, Trash2 
+  Upload, Download, Trash2, File
 } from './Icons';
 
 interface ToolbarProps {
@@ -14,6 +15,7 @@ interface ToolbarProps {
   onAddLabel: () => void;
   onRandomize: () => void;
   onPaste: () => void;
+  onNewProject: () => void;
   onSave: () => void;
   onSaveAsNew: () => void;
   onExportBackup: () => void;
@@ -31,6 +33,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onAddLabel,
   onRandomize,
   onPaste,
+  onNewProject,
   onSave,
   onSaveAsNew,
   onExportBackup,
@@ -61,6 +64,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <div className="w-px h-4 bg-canvas-800 mx-2"></div>
             <button onClick={onPaste} className="p-1.5 text-canvas-400 hover:text-white rounded" title="Paste"><ClipboardPaste size={16}/></button>
             <div className="w-px h-4 bg-canvas-800 mx-2"></div>
+            
+            <button onClick={onNewProject} className="p-1.5 text-canvas-400 hover:text-white rounded" title="New Project"><File size={16}/></button>
             <button onClick={onSave} className="p-1.5 text-canvas-400 hover:text-white rounded" title="Save"><Save size={16}/></button>
             <button onClick={onSaveAsNew} className="p-1.5 text-canvas-400 hover:text-emerald-400 rounded" title="Save Copy"><FilePlus size={16}/></button>
             
@@ -69,7 +74,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <button onClick={onImportBackup} className="p-1.5 text-canvas-400 hover:text-purple-400 rounded" title="Import Backup"><Download size={16}/></button>
             
             <div className="w-px h-4 bg-canvas-800 mx-2"></div>
-            <button onClick={onClear} className="p-1.5 text-canvas-400 hover:text-red-400 rounded" title="Clear"><Trash2 size={16}/></button>
+            <button onClick={onClear} className="p-1.5 text-canvas-400 hover:text-red-400 rounded" title="Reset Workspace"><Trash2 size={16}/></button>
         </div>
     </div>
   );
